@@ -22,21 +22,23 @@ export const ID_LABELS: Record<IdKind, string> = {
   passport: 'Passport',
 };
 
-/** A signed-in person. Prototype only: real accounts live on the server. */
+/** The signed-in person, as the app sees them. The account itself lives in Supabase Auth. */
 export interface Account {
   id: ID;
   email: string; // always lower-case
   name: string;
-  /** Signed up with Google (mocked in the prototype). */
+  /** Can sign in with Google. */
   google: boolean;
-  /** Salted SHA-256 of the password, never the password itself. */
-  passwordHash?: string;
-  passwordSalt?: string;
-  failedPasswordAttempts: number;
-  /** Password sign-in is paused until this time (epoch ms). */
-  passwordPausedUntil?: number;
+  /** Can sign in with a password. */
+  hasPassword: boolean;
   familyIds: ID[];
-  createdAt: number;
+}
+
+/** When two people changed the same field at once, the value that lost is kept here. */
+export interface EditHistory {
+  at: number;
+  field: string;
+  value: unknown;
 }
 
 export type MemberKind = 'account' | 'profile';
@@ -68,8 +70,13 @@ export interface Member {
   emergency?: EmergencyInfo;
   status: MemberStatus;
   isPet?: boolean;
+  /** For an invited member: the link to join (it holds the invite's secret, so it lives only inside the family's locked records). */
+  inviteLink?: string;
+  /** The server's id for the invite. */
+  inviteId?: string;
   addedBy?: ID;
   createdAt: number;
+  history?: EditHistory[];
 }
 
 export type Scope = 'personal' | 'common';
@@ -87,6 +94,7 @@ export interface Ownable {
   /** Soft delete: kept for 30 days in Recently deleted. */
   deletedAt?: number;
   deletedBy?: ID;
+  history?: EditHistory[];
 }
 
 export type FileKind = 'image' | 'pdf' | 'doc' | 'sample';
@@ -97,6 +105,10 @@ export interface FileRef {
   mime: string;
   size: number;
   kind: FileKind;
+  /** The file's own key (base64). The file is stored and uploaded encrypted with it. */
+  key?: string;
+  /** The family whose folder holds it on the server. */
+  familyId?: ID;
 }
 
 export interface DocItem extends Ownable {
@@ -191,6 +203,7 @@ export interface Task {
   createdAt: number;
   lastNudgedAt?: number;
   deletedAt?: number;
+  history?: EditHistory[];
 }
 
 export interface Contact {
@@ -201,6 +214,7 @@ export interface Contact {
   notes?: string;
   createdBy: ID;
   createdAt: number;
+  history?: EditHistory[];
 }
 
 export type ActivityKind =

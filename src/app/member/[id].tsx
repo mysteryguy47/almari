@@ -4,6 +4,7 @@ import { StyleSheet, View } from 'react-native';
 
 import { Button } from '@/components/Button';
 import { ChipChoice, DateField, Segmented, TextField, ToggleRow } from '@/components/Fields';
+import { InviteActions, InviteSheet, inviteMessage } from '@/components/InviteShare';
 import { Card, goBack, Screen, Section } from '@/components/Layout';
 import { Sheet } from '@/components/Sheet';
 import { SlideToConfirm } from '@/components/SlideToConfirm';
@@ -15,6 +16,7 @@ import { checkAadhaar, checkDrivingLicence, checkEmail, checkPan, checkPassport,
 import { BLOOD_GROUPS, GENDERS } from '@/lib/options';
 import { useApp } from '@/store/app-store';
 import { useCtx } from '@/store/hooks';
+import { cancelInvite, inviteMember, requestRemoval } from '@/sync/actions';
 import { toast } from '@/store/ui-store';
 import { space } from '@/theme/tokens';
 
@@ -28,7 +30,6 @@ export default function MemberScreen() {
   const ctx = useCtx();
   const saveMember = useApp((s) => s.saveMember);
   const setMemorial = useApp((s) => s.setMemorial);
-  const requestRemoval = useApp((s) => s.requestRemoval);
   const m = ctx && id !== 'new' ? ctx.family.members.find((x) => x.id === id) : undefined;
   const isMe = !!m && m.id === ctx?.viewerId;
 
@@ -46,6 +47,8 @@ export default function MemberScreen() {
   const [tried, setTried] = useState(false);
   const [error, setError] = useState<string>();
   const [confirmRemove, setConfirmRemove] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [invite, setInvite] = useState<{ link: string; name: string; email: string }>();
 
   if (!ctx) return <Redirect href="/" />;
   if (id !== 'new' && !m) return <Redirect href="/" />;
@@ -58,7 +61,7 @@ export default function MemberScreen() {
     email: kind === 'account' ? checkEmail(email, true) : checkEmail(email),
   };
 
-  const save = () => {
+  const save = async () => {
     setTried(true);
     setError(undefined);
     if (checks.name.level === 'error' || checks.email.level === 'error') return;
@@ -68,7 +71,19 @@ export default function MemberScreen() {
       ids, emergency,
     });
     if (!result.ok) return setError(result.error);
-    toast(m ? 'Saved' : kind === 'account' && !isPet ? `Invite ready for ${email.trim()}. They join when they sign in.` : `${fullName.trim()} added`, { tone: 'success' });
+    // Someone who will open the app gets an invite link (a new one if their email changed).
+    const needsInvite = !family.isSample && kind === 'account' && !isPet && !m?.accountId && (!m?.inviteLink || m.email !== email.trim().toLowerCase());
+    if (needsInvite) {
+      setBusy(true);
+      const made = await inviteMember(result.value);
+      setBusy(false);
+      if (!made.ok) {
+        toast(`Saved, but the invite could not be made: ${made.error}`, { tone: 'warn' });
+        return goBack();
+      }
+      return setInvite({ link: made.value, name: relation.trim() || fullName.trim().split(/\s+/)[0], email: email.trim().toLowerCase() });
+    }
+    toast(m ? 'Saved' : `${fullName.trim()} added`, { tone: 'success' });
     goBack();
   };
 
@@ -76,7 +91,7 @@ export default function MemberScreen() {
   const pending = m ? family.removalRequests.find((r) => r.memberId === m.id) : undefined;
 
   return (
-    <Screen title={m ? (isMe ? 'Your profile' : `Edit ${fullName || 'member'}`) : 'Add a family member'} footer={<Button label="Save" onPress={save} testID="member-save" />} testID="member">
+    <Screen title={m ? (isMe ? 'Your profile' : `Edit ${fullName || 'member'}`) : 'Add a family member'} footer={<Button label="Save" onPress={save} loading={busy} testID="member-save" />} testID="member">
       {!m ? (
         <Section title="Will they open the app?">
           <Segmented<MemberKind>
@@ -87,7 +102,7 @@ export default function MemberScreen() {
           />
           <T variant="small" color="ink3">
             {kind === 'account'
-              ? 'They sign in with Google or this email and join the family automatically.'
+              ? 'You get a link to send them. They open it, sign in with this email, and they are in.'
               : 'The family keeps their papers. They can claim the profile later with their own email.'}
           </T>
         </Section>
@@ -156,6 +171,23 @@ export default function MemberScreen() {
       ) : null}
       {error ? <T variant="smallStrong" color="sindoor">{error}</T> : null}
 
+      {m && m.status === 'invited' && m.inviteLink && !family.isSample ? (
+        <Card style={styles.danger}>
+          <T variant="bodyStrong">Invited, not joined yet</T>
+          <T variant="small" color="ink2">Send this link again if they cannot find it. It works only for {m.email}.</T>
+          <InviteActions link={m.inviteLink} message={inviteMessage(m.relation || m.fullName.split(/\s+/)[0], family.name, m.inviteLink)} />
+          <Button
+            label="Cancel the invite"
+            variant="ghost"
+            testID="invite-cancel"
+            onPress={async () => {
+              const r = await cancelInvite(m.id);
+              toast(r.ok ? 'Invite cancelled. Save again to make a new one.' : r.error, { tone: r.ok ? 'info' : 'warn' });
+            }}
+          />
+        </Card>
+      ) : null}
+
       {m && !isMe ? (
         <Card style={styles.danger}>
           {m.kind === 'profile' && !m.isPet ? (
@@ -187,10 +219,10 @@ export default function MemberScreen() {
           <SlideToConfirm
             label={removal?.ok && removal.needsApproval ? 'Slide to ask' : 'Slide to remove'}
             tone="sindoor"
-            onConfirm={() => {
+            onConfirm={async () => {
               setConfirmRemove(false);
               if (!m) return;
-              const r = requestRemoval(m.id);
+              const r = family.isSample ? useApp.getState().requestRemoval(m.id) : await requestRemoval(m.id);
               if (!r.ok) return toast(r.error, { tone: 'warn' });
               toast(r.value === 'removed' ? `${m.fullName} removed` : 'Asked. Another member must approve.', { tone: 'success' });
               goBack();
@@ -198,6 +230,19 @@ export default function MemberScreen() {
           />
         </View>
       </Sheet>
+      {invite ? (
+        <InviteSheet
+          visible
+          onClose={() => {
+            setInvite(undefined);
+            goBack();
+          }}
+          name={invite.name}
+          email={invite.email}
+          familyName={family.name}
+          link={invite.link}
+        />
+      ) : null}
     </Screen>
   );
 }

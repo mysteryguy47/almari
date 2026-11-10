@@ -3,13 +3,14 @@ import type { ComponentProps } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { AddSheet } from '@/components/AddSheet';
+import { FamilyArriving } from '@/components/CloudStatus';
 import { Icon } from '@/components/Icon';
 import { Pressy } from '@/components/Pressy';
 import { T } from '@/components/Text';
 import type { IconName } from '@/domain/icons';
 import { haptic } from '@/lib/device';
 import { useApp } from '@/store/app-store';
-import { useCtx } from '@/store/hooks';
+import { useCtx, useDeviceReady } from '@/store/hooks';
 import { useUi } from '@/store/ui-store';
 import { useTheme } from '@/theme/ThemeProvider';
 import { MAX_WIDTH, space, TAB_BAR_HEIGHT } from '@/theme/tokens';
@@ -75,10 +76,21 @@ function TabBar({ state, navigateToTab, insets }: BottomTabBarProps) {
 
 export default function TabsLayout() {
   const ctx = useCtx();
-  const signedIn = useApp((s) => !!s.session.accountId);
+  const cloud = useApp((s) => s.cloud);
+  const sessionFamily = useApp((s) => s.session.familyId);
   const pinSet = useApp((s) => !!s.device.pinHash);
+  const lockedOut = useApp((s) => !!s.device.lockedOut);
+  const deviceReady = useDeviceReady();
 
-  if (!ctx) return <Redirect href={signedIn ? '/start/you' : '/welcome'} />;
+  if (!ctx) {
+    if (!cloud) return <Redirect href="/welcome" />;
+    if (lockedOut) return <Redirect href="/auth/sign-in" />;
+    if (!deviceReady) return <Redirect href="/setup/device" />;
+    // Just joined: the family's papers are on their way down.
+    if (sessionFamily && cloud.memberships[sessionFamily]) return <FamilyArriving />;
+    return <Redirect href="/start/you" />;
+  }
+  if (!ctx.family.isSample && lockedOut) return <Redirect href="/auth/sign-in" />;
   if (!ctx.family.isSample && !pinSet) return <Redirect href="/start/pin" />;
 
   return (

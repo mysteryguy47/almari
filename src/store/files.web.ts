@@ -1,8 +1,13 @@
 /**
- * Document files on the web: stored as Blobs in IndexedDB, shown through
- * object URLs, shared through the Web Share API where the browser allows it
- * (Safari on iPhone does) and downloaded otherwise.
+ * Document files on the web (the iPhone version). Each file is encrypted with
+ * its own key before it is stored in IndexedDB or uploaded, and opened only to
+ * show or share it. Files missing here (added on another phone) are fetched
+ * from the server once and kept, so they open without internet next time.
  */
+import type { FileRef } from '@/domain/types';
+import { decryptFile, encryptFile, fromB64, initCrypto } from '@/lib/crypto';
+import { fileContext } from '@/sync/contexts';
+
 import { idbDelete, idbGet, idbSet } from './idb';
 
 export interface PickedFile {
@@ -13,33 +18,77 @@ export interface PickedFile {
   blob?: Blob;
 }
 
-const urls = new Map<string, string>();
+type Remote = (familyId: string, fileId: string) => Promise<Uint8Array | null>;
+let remote: Remote | null = null;
 
-export async function saveFile(id: string, picked: PickedFile): Promise<void> {
-  const blob = picked.blob ?? (await (await fetch(picked.uri)).blob());
-  await idbSet('files', id, blob);
+/** The sync layer tells this module how to fetch a file this device does not have yet. */
+export function setFileRemote(fetcher: Remote | null): void {
+  remote = fetcher;
 }
 
-export async function fileUrl(id: string, _name?: string): Promise<string | null> {
-  const cached = urls.get(id);
+const urls = new Map<string, string>();
+
+async function asBytes(value: unknown): Promise<Uint8Array | null> {
+  if (!value) return null;
+  if (value instanceof Uint8Array) return value;
+  if (value instanceof ArrayBuffer) return new Uint8Array(value);
+  if (value instanceof Blob) return new Uint8Array(await value.arrayBuffer());
+  return null;
+}
+
+const locked = (ref: Pick<FileRef, 'key' | 'familyId'>): ref is { key: string; familyId: string } => !!ref.key && !!ref.familyId;
+
+/** For the sync engine: the encrypted bytes, as stored and uploaded. */
+export const cipherStore = {
+  read: async (id: string) => asBytes(await idbGet('files', id)),
+  write: async (id: string, bytes: Uint8Array) => {
+    await idbSet('files', id, bytes);
+  },
+  has: async (id: string) => (await idbGet('files', id)) !== undefined,
+  forget: async (id: string) => {
+    const url = urls.get(id);
+    if (url) URL.revokeObjectURL(url);
+    urls.delete(id);
+    await idbDelete('files', id);
+  },
+};
+
+export async function saveFile(ref: FileRef, picked: PickedFile): Promise<void> {
+  const blob = picked.blob ?? (await (await fetch(picked.uri)).blob());
+  if (locked(ref)) {
+    await initCrypto();
+    const plain = new Uint8Array(await blob.arrayBuffer());
+    await idbSet('files', ref.id, encryptFile(plain, fromB64(ref.key), fileContext(ref.familyId, ref.id)));
+  } else {
+    await idbSet('files', ref.id, blob);
+  }
+}
+
+/** The file's own bytes, opened. Fetches it from the server first if this device does not have it. */
+export async function fileBytes(ref: FileRef): Promise<Uint8Array | null> {
+  let stored = await asBytes(await idbGet('files', ref.id));
+  if (!stored && locked(ref) && remote) {
+    stored = await remote(ref.familyId, ref.id);
+    if (stored) await idbSet('files', ref.id, stored);
+  }
+  if (!stored) return null;
+  if (!locked(ref)) return stored;
+  await initCrypto();
+  return decryptFile(stored, fromB64(ref.key), fileContext(ref.familyId, ref.id));
+}
+
+export async function fileUrl(ref: FileRef): Promise<string | null> {
+  const cached = urls.get(ref.id);
   if (cached) return cached;
-  const blob = await idbGet<Blob>('files', id);
-  if (!blob) return null;
-  const url = URL.createObjectURL(blob);
-  urls.set(id, url);
+  const bytes = await fileBytes(ref);
+  if (!bytes) return null;
+  const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: ref.mime || 'application/octet-stream' }));
+  urls.set(ref.id, url);
   return url;
 }
 
-export async function removeFile(id: string, _name?: string): Promise<void> {
-  const url = urls.get(id);
-  if (url) URL.revokeObjectURL(url);
-  urls.delete(id);
-  await idbDelete('files', id);
-}
-
-export async function fileBytes(id: string, _name?: string): Promise<Uint8Array | null> {
-  const blob = await idbGet<Blob>('files', id);
-  return blob ? new Uint8Array(await blob.arrayBuffer()) : null;
+export async function removeFile(ref: Pick<FileRef, 'id'>): Promise<void> {
+  await cipherStore.forget(ref.id);
 }
 
 /** Shares a Blob through the Web Share API (iPhone Safari supports files); downloads it otherwise. */
@@ -79,24 +128,8 @@ export async function shareResult(result: { uri: string; blob?: Blob }, name: st
   return result.blob ? shareBlob(result.blob, name, mime) : shareUri(result.uri, name, mime);
 }
 
-export async function shareFile(id: string, name: string, mime: string): Promise<boolean> {
-  const blob = await idbGet<Blob>('files', id);
-  if (!blob) return false;
-  const file = new File([blob], name, { type: mime });
-  const nav = navigator as Navigator & { canShare?: (data: ShareData) => boolean };
-  if (nav.share && nav.canShare?.({ files: [file] })) {
-    try {
-      await nav.share({ files: [file], title: name });
-      return true;
-    } catch (e) {
-      if ((e as Error)?.name === 'AbortError') return false; // the person closed the share sheet
-    }
-  }
-  const url = await fileUrl(id);
-  if (!url) return false;
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = name;
-  a.click();
-  return true;
+export async function shareFile(ref: FileRef): Promise<boolean> {
+  const bytes = await fileBytes(ref);
+  if (!bytes) return false;
+  return shareBlob(new Blob([bytes as BlobPart], { type: ref.mime }), ref.name, ref.mime);
 }

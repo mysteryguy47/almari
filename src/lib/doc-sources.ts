@@ -7,7 +7,7 @@ export async function fileToPdfSource(file: FileRef | undefined): Promise<PdfSou
   if (!file) return { kind: 'missing', reason: 'No file saved for this side.' };
   if (file.kind === 'sample') return { kind: 'missing', reason: 'Sample paper: in a real family, the photo or PDF goes here.' };
   if (file.kind === 'doc') return { kind: 'missing', reason: `${file.name} is a Word, Excel or text file. Share it separately.` };
-  const bytes = await fileBytes(file.id, file.name);
+  const bytes = await fileBytes(file);
   if (!bytes) return { kind: 'missing', reason: 'The file is no longer on this phone.' };
   return file.kind === 'pdf' ? { kind: 'pdf', bytes } : { kind: 'image', bytes, mime: file.mime };
 }

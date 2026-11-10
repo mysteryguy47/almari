@@ -77,7 +77,7 @@ export default function DocumentView() {
     if (!file) return;
     if (file.kind === 'sample') return toast('Sample papers are pictures we drew, so there is no file to share.');
     if (isAadhaar) toast('Share Aadhaar only where it is truly needed.', { tone: 'warn' });
-    const ok = await shareFile(file.id, file.name, file.mime);
+    const ok = await shareFile(file);
     if (!ok) toast('Could not open the share sheet on this device', { tone: 'warn' });
   };
 

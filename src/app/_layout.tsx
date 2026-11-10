@@ -9,10 +9,13 @@ import { Platform } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { DeviceRequestsHost } from '@/components/DeviceRequests';
 import { AppLock, ReauthHost } from '@/components/Security';
 import { ToastHost } from '@/components/Toast';
 import { useApp } from '@/store/app-store';
 import { requestPersistentStorage } from '@/store/idb';
+import { resumeSession } from '@/sync/account';
+import { cloudConfigured, startCloud } from '@/sync/runtime';
 import { ThemeProvider, useTheme } from '@/theme/ThemeProvider';
 
 SplashScreen.preventAutoHideAsync().catch(() => undefined);
@@ -29,6 +32,13 @@ export default function RootLayout() {
   }, [ready]);
 
   useEffect(() => {
+    // Once saved data has loaded: check the sign-in is still good, then keep the family in sync.
+    if (!hydrated || !cloudConfigured()) return;
+    startCloud();
+    resumeSession().catch((e) => console.warn('Could not check the sign-in', e));
+  }, [hydrated]);
+
+  useEffect(() => {
     // On the web (the iPhone app), ask the browser to keep our storage.
     if (Platform.OS === 'web') requestPersistentStorage().catch(() => undefined);
   }, []);
@@ -41,6 +51,7 @@ export default function RootLayout() {
           <ThemedStack />
           <AppLock />
           <ReauthHost />
+          <DeviceRequestsHost />
           <ToastHost />
         </ThemeProvider>
       </SafeAreaProvider>

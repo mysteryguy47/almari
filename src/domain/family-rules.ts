@@ -73,6 +73,13 @@ export function canApproveRemoval(family: Family, approverId: ID, memberId: ID):
 
 // ---------------------------------------------------------------- wrong PINs and passwords
 
+/** Wrong-password bookkeeping for one email. */
+export interface PasswordAttempts {
+  failedPasswordAttempts: number;
+  /** Password sign-in is paused until this time (epoch ms). */
+  passwordPausedUntil?: number;
+}
+
 export const MAX_ATTEMPTS = 5;
 export const PASSWORD_PAUSE_MS = 30 * 60 * 1000;
 
@@ -80,7 +87,7 @@ export function attemptsLeft(failures: number): number {
   return Math.max(0, MAX_ATTEMPTS - failures);
 }
 
-export function isPasswordPaused(account: Pick<Account, 'passwordPausedUntil'>, now: number): boolean {
+export function isPasswordPaused(account: Pick<PasswordAttempts, 'passwordPausedUntil'>, now: number): boolean {
   return account.passwordPausedUntil !== undefined && now < account.passwordPausedUntil;
 }
 
@@ -89,7 +96,7 @@ export function isPasswordPaused(account: Pick<Account, 'passwordPausedUntil'>, 
  * 30 minutes (a pause, not a permanent lock, so a stranger cannot shut the
  * owner out); a reset link unlocks it at once.
  */
-export function afterWrongPassword<T extends Pick<Account, 'failedPasswordAttempts' | 'passwordPausedUntil'>>(
+export function afterWrongPassword<T extends PasswordAttempts>(
   account: T,
   now: number,
 ): T {
@@ -100,7 +107,7 @@ export function afterWrongPassword<T extends Pick<Account, 'failedPasswordAttemp
   return { ...account, failedPasswordAttempts: failures };
 }
 
-export function afterRightPassword<T extends Pick<Account, 'failedPasswordAttempts' | 'passwordPausedUntil'>>(account: T): T {
+export function afterRightPassword<T extends PasswordAttempts>(account: T): T {
   return { ...account, failedPasswordAttempts: 0, passwordPausedUntil: undefined };
 }
 

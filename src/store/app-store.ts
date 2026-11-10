@@ -1,30 +1,32 @@
 /**
- * The app's state: accounts, families and this device's settings, saved on
- * the phone after every change. Every rule lives in src/domain; this file
- * only applies those rules and records what happened.
+ * The app's state: families, this device's settings and the signed-in
+ * account's cloud state, saved on the device after every change (encrypted at
+ * rest on the web). Every rule lives in src/domain; this file only applies
+ * those rules and records what happened.
  *
- * Prototype note: sign-in is simulated on the device (there is no server yet),
- * and nothing is encrypted yet. Both arrive in the MVP.
+ * Edits here are local. src/sync watches the families that belong to the
+ * signed-in account and carries every change to the server, locked.
+ * Sign-in, invites, leaving and removals talk to the server first, in
+ * src/sync/actions.ts, then change the state here.
  */
 import { create } from 'zustand';
-import { createJSONStorage, persist } from 'zustand/middleware';
+import { persist } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
 
 import { displayName, findMember } from '@/domain/access';
-import {
-  afterRightPassword, afterWrongPassword, afterWrongPin, attemptsLeft, canApproveRemoval, canJoinAnotherFamily,
-  checkRemoval, isPasswordPaused, MAX_MEMBERS, normaliseIdNumber,
-} from '@/domain/family-rules';
+import { afterWrongPin, attemptsLeft, canApproveRemoval, checkRemoval, MAX_MEMBERS, normaliseIdNumber } from '@/domain/family-rules';
 import { buildSampleFamily, SAMPLE_FAMILY_ID, SAMPLE_VIEWER_ID } from '@/domain/sample';
 import { getTemplate } from '@/domain/templates';
 import type {
-  Account, ActivityKind, BankAccount, CardItem, Contact, DocItem, Family, ID, IdKind, LoginItem, Member,
+  ActivityKind, BankAccount, CardItem, Contact, DocItem, Family, ID, IdKind, LoginItem, Member,
   PersonalSharing, ReminderPrefs, SecureNote, Task, ThemePref,
 } from '@/domain/types';
 import { normaliseEmail } from '@/domain/validation';
+import type { CloudState } from '@/sync/types';
 
 import { removeFile } from './files';
 import { kv } from './kv';
+import { batchedStorage } from './persist-storage';
 import { hashSecret, newId, newSalt } from './secrets';
 
 export const RECENTLY_DELETED_DAYS = 30;
@@ -35,35 +37,32 @@ export interface Device {
   pinSalt?: string;
   pinFailures: number;
   biometrics: boolean;
-  /** Has seen the "this is a prototype" note. */
+  /** Has seen the note about using test papers while Almari is in beta. */
   seenPrototypeNote: boolean;
+  /** This device's id on the server (Settings → Devices). */
+  deviceId: string;
+  /** Five wrong PINs: the person must sign in again. Nothing is wiped. */
+  lockedOut?: boolean;
 }
 
 export interface Session {
-  accountId?: ID;
   familyId?: ID;
   /** Sample family only: whose eyes we are looking through. */
   viewAs?: ID;
 }
 
 export interface PersistedState {
-  version: 1;
-  accounts: Record<ID, Account>;
+  version: 2;
   families: Record<ID, Family>;
   session: Session;
   device: Device;
+  /** The signed-in account. Undefined when signed out. */
+  cloud?: CloudState;
 }
 
 export type Result<T = undefined> = { ok: true; value: T } | { ok: false; error: string };
 const ok = <T,>(value: T): Result<T> => ({ ok: true, value });
 const fail = (error: string): Result<never> => ({ ok: false, error });
-
-export type SignInResult =
-  | { status: 'ok' }
-  | { status: 'no-account' }
-  | { status: 'google-only' }
-  | { status: 'wrong'; attemptsLeft: number }
-  | { status: 'paused'; until: number };
 
 export type PinResult = { status: 'ok' } | { status: 'wrong'; attemptsLeft: number } | { status: 'locked-out' };
 
@@ -81,22 +80,19 @@ export type MemberInput = Omit<Member, 'id' | 'createdAt' | 'status' | 'addedBy'
 export interface AppState extends PersistedState {
   hydrated: boolean;
 
-  // ---- sign-in (simulated on the device in the prototype)
-  signUpWithEmail(name: string, email: string, password: string): Promise<Result>;
-  signInWithEmail(email: string, password: string, now?: number): Promise<SignInResult>;
-  continueWithGoogle(name: string, email: string): Result;
-  resetPassword(email: string, newPassword: string): Promise<Result>;
-  setPassword(newPassword: string, currentPassword?: string): Promise<Result>;
-  signOut(): void;
-  deleteAccount(): void;
+  /** Forgets everything this device holds for the account (sign-out, a removed device). Keeps the theme. */
+  clearLocal(): void;
 
   // ---- families
-  createFamily(name: string, you: Pick<Member, 'fullName' | 'dob' | 'gender' | 'phone'>): Result<ID>;
-  joinPendingInvites(): ID[];
+  /** Puts a family the account just created or joined on this device. */
+  addFamily(family: Family, open: boolean): void;
+  /** Takes a family off this device (left it, removed, or deleted). */
+  forgetFamily(familyId: ID): void;
   switchFamily(familyId: ID): void;
   renameFamily(name: string): void;
   setPersonalSharing(value: PersonalSharing): void;
-  leaveFamily(): void;
+  /** Before leaving: the viewer's personal items and member card leave the family with them. */
+  leaveLocally(): void;
 
   // ---- members
   saveMember(input: MemberInput): Result<ID>;
@@ -104,6 +100,8 @@ export interface AppState extends PersistedState {
   requestRemoval(memberId: ID): Result<'removed' | 'requested'>;
   approveRemoval(memberId: ID): Result;
   cancelRemoval(memberId: ID): void;
+  /** A member who left or was removed elsewhere: their member card goes too. */
+  dropMember(memberId: ID, by?: ID): void;
 
   // ---- items
   saveDocument(input: DocInput): ID;
@@ -146,12 +144,14 @@ function familyOf(s: PersistedState): Family | undefined {
   return s.session.familyId ? s.families[s.session.familyId] : undefined;
 }
 
-/** The member the person on this phone is, in the current family. */
+/** The member the person on this device is, in the current family. */
 export function viewerIdOf(s: PersistedState): ID | undefined {
   const family = familyOf(s);
   if (!family) return undefined;
   if (family.isSample) return s.session.viewAs ?? SAMPLE_VIEWER_ID;
-  return family.members.find((m) => m.accountId && m.accountId === s.session.accountId)?.id;
+  const memberId = s.cloud?.memberships[family.id]?.memberId;
+  if (!memberId || !family.members.some((m) => m.id === memberId)) return undefined;
+  return memberId;
 }
 
 function log(family: Family, by: ID, kind: ActivityKind, text: string) {
@@ -190,19 +190,11 @@ function upsert<T extends { id: ID; createdAt: number; updatedAt: number; create
   return { id, created: true };
 }
 
-function emptyFamily(id: ID, name: string, createdBy: ID): Family {
-  return {
-    id, name, createdAt: Date.now(), createdBy, personalSharing: 'family',
-    members: [], documents: [], logins: [], bankAccounts: [], cards: [], notes: [], tasks: [], contacts: [],
-    activity: [], reminderPrefs: {}, removalRequests: [],
-  };
-}
-
 /** Removes a member's own items from a family (on leaving or removal); files are deleted too. */
 function dropPersonalItems(family: Family, memberId: ID) {
   for (const doc of family.documents) {
     if (doc.ownerId === memberId || (doc.onlyMe && doc.createdBy === memberId)) {
-      doc.files.forEach((f) => void removeFile(f.id, f.name).catch(() => undefined));
+      doc.files.forEach((f) => void removeFile(f).catch(() => undefined));
     }
   }
   const keep = <T extends { ownerId?: ID; onlyMe: boolean; createdBy: ID }>(items: T[]) =>
@@ -214,12 +206,15 @@ function dropPersonalItems(family: Family, memberId: ID) {
   family.notes = keep(family.notes);
 }
 
+function freshDevice(theme: ThemePref = 'system'): Device {
+  return { theme, pinFailures: 0, biometrics: false, seenPrototypeNote: false, deviceId: newId() };
+}
+
 const INITIAL: PersistedState = {
-  version: 1,
-  accounts: {},
+  version: 2,
   families: {},
   session: {},
-  device: { theme: 'system', pinFailures: 0, biometrics: false, seenPrototypeNote: false },
+  device: freshDevice(),
 };
 
 // ------------------------------------------------------------------ the store
@@ -241,180 +236,49 @@ export const useApp = create<AppState>()(
         ...INITIAL,
         hydrated: false,
 
-        // ---------------------------------------------------------- sign-in
-        async signUpWithEmail(name, email, password) {
-          const address = normaliseEmail(email);
-          if (Object.values(get().accounts).some((a) => a.email === address)) {
-            return fail('An account with this email already exists. Sign in instead.');
-          }
-          const salt = newSalt();
-          const passwordHash = await hashSecret(password, salt);
-          const id = newId();
+        clearLocal() {
           set((s) => {
-            s.accounts[id] = {
-              id, email: address, name: name.trim(), google: false, passwordHash, passwordSalt: salt,
-              failedPasswordAttempts: 0, familyIds: [], createdAt: Date.now(),
-            };
-            s.session = { accountId: id };
-          });
-          return ok(undefined);
-        },
-
-        async signInWithEmail(email, password, now = Date.now()) {
-          const address = normaliseEmail(email);
-          const account = Object.values(get().accounts).find((a) => a.email === address);
-          if (!account) return { status: 'no-account' };
-          if (!account.passwordHash || !account.passwordSalt) return { status: 'google-only' };
-          if (isPasswordPaused(account, now)) return { status: 'paused', until: account.passwordPausedUntil as number };
-          const hash = await hashSecret(password, account.passwordSalt);
-          if (hash !== account.passwordHash) {
-            const next = afterWrongPassword(account, now);
-            set((s) => {
-              s.accounts[account.id] = next;
-            });
-            return next.passwordPausedUntil && next.passwordPausedUntil > now
-              ? { status: 'paused', until: next.passwordPausedUntil }
-              : { status: 'wrong', attemptsLeft: attemptsLeft(next.failedPasswordAttempts) };
-          }
-          set((s) => {
-            s.accounts[account.id] = afterRightPassword(s.accounts[account.id]);
-            s.session = { accountId: account.id, familyId: s.accounts[account.id].familyIds[0] };
-            s.device.pinFailures = 0;
-          });
-          return { status: 'ok' };
-        },
-
-        continueWithGoogle(name, email) {
-          const address = normaliseEmail(email);
-          set((s) => {
-            const existing = Object.values(s.accounts).find((a) => a.email === address);
-            if (existing) {
-              existing.google = true; // same email: linked to the same account
-              s.session = { accountId: existing.id, familyId: existing.familyIds[0] };
-            } else {
-              const id = newId();
-              s.accounts[id] = {
-                id, email: address, name: name.trim(), google: true, failedPasswordAttempts: 0, familyIds: [], createdAt: Date.now(),
-              };
-              s.session = { accountId: id };
+            for (const family of Object.values(s.families)) {
+              for (const doc of family.documents) doc.files.forEach((f) => void removeFile(f).catch(() => undefined));
             }
-            s.device.pinFailures = 0;
-          });
-          return ok(undefined);
-        },
-
-        async resetPassword(email, newPassword) {
-          const account = Object.values(get().accounts).find((a) => a.email === normaliseEmail(email));
-          if (!account) return fail('No account uses this email');
-          const salt = newSalt();
-          const hash = await hashSecret(newPassword, salt);
-          set((s) => {
-            const a = s.accounts[account.id];
-            a.passwordHash = hash;
-            a.passwordSalt = salt;
-            a.failedPasswordAttempts = 0;
-            a.passwordPausedUntil = undefined;
-          });
-          return ok(undefined);
-        },
-
-        async setPassword(newPassword, currentPassword) {
-          const { session, accounts } = get();
-          const account = session.accountId ? accounts[session.accountId] : undefined;
-          if (!account) return fail('Sign in first');
-          if (account.passwordHash && account.passwordSalt) {
-            const current = await hashSecret(currentPassword ?? '', account.passwordSalt);
-            if (current !== account.passwordHash) return fail('Your current password is not right');
-          }
-          const salt = newSalt();
-          const hash = await hashSecret(newPassword, salt);
-          set((s) => {
-            const a = s.accounts[account.id];
-            a.passwordHash = hash;
-            a.passwordSalt = salt;
-            a.failedPasswordAttempts = 0;
-            a.passwordPausedUntil = undefined;
-          });
-          return ok(undefined);
-        },
-
-        signOut() {
-          set((s) => {
-            if (familyOf(s)?.isSample) delete s.families[SAMPLE_FAMILY_ID];
+            s.families = {};
             s.session = {};
-          });
-        },
-
-        deleteAccount() {
-          set((s) => {
-            const accountId = s.session.accountId;
-            if (!accountId) return;
-            for (const familyId of s.accounts[accountId]?.familyIds ?? []) {
-              const family = s.families[familyId];
-              if (!family) continue;
-              const member = family.members.find((m) => m.accountId === accountId);
-              if (member) {
-                dropPersonalItems(family, member.id);
-                family.members = family.members.filter((m) => m.id !== member.id);
-                log(family, member.id, 'member', `${member.fullName} deleted their account and left`);
-              }
-              const othersRemain = family.members.some((m) => m.kind === 'account' && m.accountId);
-              if (!othersRemain) delete s.families[familyId];
-            }
-            delete s.accounts[accountId];
-            s.session = {};
-            s.device.pinHash = undefined;
-            s.device.pinSalt = undefined;
+            s.cloud = undefined;
+            s.device = freshDevice(s.device.theme);
           });
         },
 
         // ---------------------------------------------------------- families
-        createFamily(name, you) {
-          const s0 = get();
-          const account = s0.session.accountId ? s0.accounts[s0.session.accountId] : undefined;
-          if (!account) return fail('Sign in first');
-          if (!canJoinAnotherFamily(account)) return fail('You can be in up to 3 families. Leave one to start another.');
-          const familyId = newId();
+        addFamily(family, open) {
           set((s) => {
-            const family = emptyFamily(familyId, name.trim(), account.id);
-            const memberId = newId();
-            family.members.push({
-              id: memberId, kind: 'account', accountId: account.id, email: account.email, fullName: you.fullName.trim(),
-              dob: you.dob, gender: you.gender, phone: you.phone, ids: {}, status: 'active', addedBy: memberId, createdAt: Date.now(),
-            });
-            log(family, memberId, 'member', `started ${family.name}`);
-            s.families[familyId] = family;
-            s.accounts[account.id].familyIds.push(familyId);
-            s.accounts[account.id].name = you.fullName.trim();
-            s.session.familyId = familyId;
+            s.families[family.id] = family;
+            if (open || !s.session.familyId || !s.families[s.session.familyId] || s.families[s.session.familyId]?.isSample) {
+              s.session = { familyId: family.id };
+            }
           });
-          return ok(familyId);
         },
 
-        joinPendingInvites() {
-          const joined: ID[] = [];
+        forgetFamily(familyId) {
           set((s) => {
-            const account = s.session.accountId ? s.accounts[s.session.accountId] : undefined;
-            if (!account) return;
-            for (const family of Object.values(s.families)) {
-              if (family.isSample || account.familyIds.includes(family.id)) continue;
-              const invite = family.members.find((m) => m.kind === 'account' && m.status === 'invited' && m.email === account.email);
-              if (!invite || !canJoinAnotherFamily(account)) continue;
-              invite.accountId = account.id;
-              invite.status = 'active';
-              account.familyIds.push(family.id);
-              log(family, invite.id, 'member', 'joined the family');
-              joined.push(family.id);
+            const family = s.families[familyId];
+            if (!family) return;
+            for (const doc of family.documents) doc.files.forEach((f) => void removeFile(f).catch(() => undefined));
+            delete s.families[familyId];
+            if (s.cloud) {
+              delete s.cloud.memberships[familyId];
+              delete s.cloud.sync[familyId];
+              delete s.cloud.familyKeys[familyId];
             }
-            if (!s.session.familyId && joined[0]) s.session.familyId = joined[0];
+            if (s.session.familyId === familyId) {
+              const next = Object.keys(s.cloud?.memberships ?? {}).find((id) => s.families[id]);
+              s.session = next ? { familyId: next } : {};
+            }
           });
-          return joined;
         },
 
         switchFamily(familyId) {
           set((s) => {
-            const account = s.session.accountId ? s.accounts[s.session.accountId] : undefined;
-            if (account?.familyIds.includes(familyId)) s.session.familyId = familyId;
+            if (s.cloud?.memberships[familyId] && s.families[familyId]) s.session = { familyId };
           });
         },
 
@@ -436,21 +300,14 @@ export const useApp = create<AppState>()(
           });
         },
 
-        leaveFamily() {
-          set((s) => {
-            const family = familyOf(s);
-            const viewer = viewerIdOf(s);
-            const accountId = s.session.accountId;
-            if (!family || !viewer || !accountId || family.isSample) return;
+        leaveLocally() {
+          onFamily((family, viewer) => {
+            if (family.isSample) return;
             const me = findMember(family, viewer);
             dropPersonalItems(family, viewer);
             family.members = family.members.filter((m) => m.id !== viewer);
             family.removalRequests = family.removalRequests.filter((r) => r.memberId !== viewer && r.requestedBy !== viewer);
             log(family, viewer, 'member', `${me?.fullName ?? 'Someone'} left the family`);
-            const account = s.accounts[accountId];
-            account.familyIds = account.familyIds.filter((id) => id !== family.id);
-            if (!family.members.some((m) => m.kind === 'account' && m.accountId)) delete s.families[family.id];
-            s.session.familyId = account.familyIds[0];
           });
         },
 
@@ -536,10 +393,6 @@ export const useApp = create<AppState>()(
           set((s) => {
             const f = familyOf(s) as Family;
             const member = findMember(f, memberId);
-            if (member?.accountId) {
-              const account = s.accounts[member.accountId];
-              if (account) account.familyIds = account.familyIds.filter((id) => id !== f.id);
-            }
             dropPersonalItems(f, memberId);
             f.members = f.members.filter((m) => m.id !== memberId);
             f.removalRequests = f.removalRequests.filter((r) => r.memberId !== memberId);
@@ -552,6 +405,17 @@ export const useApp = create<AppState>()(
           onFamily((family, viewer) => {
             family.removalRequests = family.removalRequests.filter((r) => r.memberId !== memberId);
             log(family, viewer, 'member', `cancelled the request to remove ${nameOf(family, memberId)}`);
+          });
+        },
+
+        dropMember(memberId, by) {
+          onFamily((family, viewer) => {
+            const member = findMember(family, memberId);
+            if (!member) return;
+            dropPersonalItems(family, memberId);
+            family.members = family.members.filter((m) => m.id !== memberId);
+            family.removalRequests = family.removalRequests.filter((r) => r.memberId !== memberId);
+            if (by) log(family, by ?? viewer, 'member', `${member.fullName} left the family`);
           });
         },
 
@@ -640,7 +504,7 @@ export const useApp = create<AppState>()(
             for (const family of Object.values(s.families)) {
               for (const doc of family.documents) {
                 if (doc.deletedAt && doc.deletedAt < cutoff) {
-                  doc.files.forEach((f) => void removeFile(f.id, f.name).catch(() => undefined));
+                  doc.files.forEach((f) => void removeFile(f).catch(() => undefined));
                 }
               }
               const alive = <T extends { deletedAt?: number }>(items: T[]) => items.filter((i) => !i.deletedAt || i.deletedAt >= cutoff);
@@ -786,7 +650,7 @@ export const useApp = create<AppState>()(
           const { failures, lockedOut } = afterWrongPin(device.pinFailures);
           set((s) => {
             s.device.pinFailures = lockedOut ? 0 : failures;
-            if (lockedOut) s.session = {}; // sign in again; nothing is wiped
+            if (lockedOut) s.device.lockedOut = true; // sign in again; nothing is wiped
           });
           return lockedOut ? { status: 'locked-out' } : { status: 'wrong', attemptsLeft: attemptsLeft(failures) };
         },
@@ -822,18 +686,26 @@ export const useApp = create<AppState>()(
         exitSample() {
           set((s) => {
             delete s.families[SAMPLE_FAMILY_ID];
-            s.session = {};
+            const next = Object.keys(s.cloud?.memberships ?? {}).find((id) => s.families[id]);
+            s.session = next ? { familyId: next } : {};
           });
         },
       };
     }),
     {
       name: 'almari-state',
-      version: 1,
-      storage: createJSONStorage(() => kv),
+      version: 2,
+      storage: batchedStorage<PersistedState>(kv),
       partialize: (s): PersistedState => ({
-        version: s.version, accounts: s.accounts, families: s.families, session: s.session, device: s.device,
+        version: s.version, families: s.families, session: s.session, device: s.device, cloud: s.cloud,
       }),
+      // Version 1 was the prototype: simulated accounts and test papers on this device only.
+      // Real accounts start clean; only the theme carries over.
+      migrate: (persisted, version) => {
+        const old = (persisted ?? {}) as Partial<PersistedState> & { device?: Partial<Device> };
+        if (version < 2) return { ...INITIAL, device: freshDevice(old.device?.theme ?? 'system') } as unknown as AppState;
+        return persisted as AppState;
+      },
       onRehydrateStorage: () => (state, error) => {
         if (error) console.warn('Could not read saved data', error);
         useApp.setState({ hydrated: true });

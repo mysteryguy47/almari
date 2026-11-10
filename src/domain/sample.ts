@@ -164,9 +164,10 @@ export function buildSampleFamily(now: Date = new Date()): Family {
     personalSharing: 'family',
     members, documents, logins, bankAccounts, cards, notes, tasks, contacts,
     activity: [
-      { id: 's-a-1', at: now.getTime() - 2 * 86_400_000, by: 's-mummy', kind: 'added', text: "added Kabir's vaccination card" },
-      { id: 's-a-2', at: now.getTime() - 86_400_000, by: 's-mummy', kind: 'task', text: 'assigned Papa: Renew car insurance' },
+      // Newest first, as the app keeps it.
       { id: 's-a-3', at: now.getTime() - 3_600_000, by: 's-ananya', kind: 'added', text: 'added the family health policy' },
+      { id: 's-a-2', at: now.getTime() - 86_400_000, by: 's-mummy', kind: 'task', text: 'assigned Papa: Renew car insurance' },
+      { id: 's-a-1', at: now.getTime() - 2 * 86_400_000, by: 's-mummy', kind: 'added', text: "added Kabir's vaccination card" },
     ],
     reminderPrefs: {},
     removalRequests: [],

@@ -1,10 +1,12 @@
 /**
- * The app's state, end to end: sign-in and lockouts, linking Google and a
- * password, invites, the three-family limit, profile numbers, privacy,
- * deletes and restores, the PIN lockout, and the sample family.
+ * The app's state on the device: families, profile numbers, privacy, deletes
+ * and restores, the PIN lockout, the sample family, saving, and wiping on
+ * sign-out. Signing in itself is real now and tested against the server
+ * (tests/backend).
  */
 import { SAMPLE_FAMILY_ID, SAMPLE_VIEWER_ID } from '@/domain/sample';
-import { PASSWORD_PAUSE_MS } from '@/domain/family-rules';
+import { emptyFamily } from '@/sync/model';
+import { emptySync } from '@/sync/types';
 
 jest.mock('expo-crypto', () => {
   const nodeCrypto = jest.requireActual('crypto');
@@ -29,6 +31,8 @@ jest.mock('@/store/files', () => ({ removeFile: jest.fn(async () => undefined) }
 // Imported after the mocks on purpose: the store reads storage as it is created.
 // eslint-disable-next-line import/first
 import { useApp, viewerIdOf } from '../app-store';
+// eslint-disable-next-line import/first
+import { flushSaves } from '../persist-storage';
 
 const store = () => useApp.getState();
 const family = () => {
@@ -37,104 +41,78 @@ const family = () => {
 };
 const viewer = () => viewerIdOf(store()) as string;
 
+/** Signed in as Ayush, with one family where he is member "m-ayush". */
+function signedInFamily(name = "Khurana's", familyId = 'fam-1') {
+  useApp.setState((d) => {
+    d.cloud ??= {
+      userId: 'user-ayush', email: 'ayush@example.com', name: 'Ayush Khurana', google: false, hasPassword: true,
+      keyring: [{ version: 1, amk: 'x' }], currentVersion: 1, familyKeys: {}, memberships: {}, sync: {},
+    };
+    d.cloud.memberships[familyId] = { memberId: 'm-ayush' };
+    d.cloud.sync[familyId] = emptySync();
+  });
+  const f = emptyFamily(familyId, name, 'm-ayush');
+  f.members.push({ id: 'm-ayush', kind: 'account', accountId: 'user-ayush', email: 'ayush@example.com', fullName: 'Ayush Khurana', ids: {}, status: 'active', createdAt: 1 });
+  store().addFamily(f, true);
+}
+
 beforeEach(() => {
   mockMemory.clear();
   useApp.setState({
-    accounts: {}, families: {}, session: {},
-    device: { theme: 'system', pinFailures: 0, biometrics: false, seenPrototypeNote: false },
+    families: {}, session: {}, cloud: undefined,
+    device: { theme: 'system', pinFailures: 0, biometrics: false, seenPrototypeNote: false, deviceId: 'dev-1' },
   });
 });
 
-const you = (fullName: string) => ({ fullName, dob: '1990-01-01', gender: 'female' as const });
-
-describe('sign-in', () => {
-  it('signs up with email and refuses a second account on the same email', async () => {
-    expect((await store().signUpWithEmail('Neha Khurana', 'Neha@Example.com', 'almari2026')).ok).toBe(true);
-    expect(Object.values(store().accounts)[0].email).toBe('neha@example.com');
-    expect(Object.values(store().accounts)[0].passwordHash).not.toContain('almari2026');
-    store().signOut();
-    expect((await store().signUpWithEmail('Neha', 'neha@example.com', 'another123')).ok).toBe(false);
+describe('families on this device', () => {
+  it('knows who the viewer is from the account’s membership', () => {
+    signedInFamily();
+    expect(viewer()).toBe('m-ayush');
   });
 
-  it('five wrong passwords pause sign-in for 30 minutes; a reset unlocks it', async () => {
-    await store().signUpWithEmail('Neha', 'neha@example.com', 'almari2026');
-    store().signOut();
-    const t = Date.now();
-    for (let i = 4; i >= 1; i--) {
-      expect(await store().signInWithEmail('neha@example.com', 'wrong-pass', t)).toEqual({ status: 'wrong', attemptsLeft: i });
-    }
-    expect((await store().signInWithEmail('neha@example.com', 'wrong-pass', t)).status).toBe('paused');
-    // Even the right password waits while paused.
-    expect((await store().signInWithEmail('neha@example.com', 'almari2026', t + 1000)).status).toBe('paused');
-    expect((await store().signInWithEmail('neha@example.com', 'almari2026', t + PASSWORD_PAUSE_MS + 1)).status).toBe('ok');
-
-    store().signOut();
-    for (let i = 0; i < 5; i++) await store().signInWithEmail('neha@example.com', 'wrong-pass', t);
-    await store().resetPassword('neha@example.com', 'fresh-start-1');
-    expect((await store().signInWithEmail('neha@example.com', 'fresh-start-1', t)).status).toBe('ok');
-  });
-
-  it('a Google user can add a password and then sign in either way, to the same account', async () => {
-    store().continueWithGoogle('Ayush Khurana', 'ayush@example.com');
-    const id = store().session.accountId;
-    store().signOut();
-    expect((await store().signInWithEmail('ayush@example.com', 'anything1')).status).toBe('google-only');
-
-    store().continueWithGoogle('Ayush Khurana', 'ayush@example.com');
-    expect((await store().setPassword('my-new-pass-1')).ok).toBe(true);
-    store().signOut();
-    expect((await store().signInWithEmail('ayush@example.com', 'my-new-pass-1')).status).toBe('ok');
-    expect(store().session.accountId).toBe(id);
-  });
-
-  it('changing a password needs the current one', async () => {
-    await store().signUpWithEmail('Neha', 'neha@example.com', 'almari2026');
-    expect((await store().setPassword('next-pass-1', 'not-it')).ok).toBe(false);
-    expect((await store().setPassword('next-pass-1', 'almari2026')).ok).toBe(true);
-  });
-});
-
-describe('families', () => {
-  it('one person can be in at most three families', async () => {
-    await store().signUpWithEmail('Neha', 'neha@example.com', 'almari2026');
-    expect(store().createFamily("Khurana's", you('Neha Khurana')).ok).toBe(true);
-    expect(store().createFamily("Arora's", you('Neha Khurana')).ok).toBe(true);
-    expect(store().createFamily('Neha & Raghav', you('Neha Khurana')).ok).toBe(true);
-    const fourth = store().createFamily('One more', you('Neha Khurana'));
-    expect(fourth.ok).toBe(false);
-    const account = Object.values(store().accounts)[0];
-    store().switchFamily(account.familyIds[0]);
+  it('switches only between families the account belongs to', () => {
+    signedInFamily("Khurana's", 'fam-1');
+    signedInFamily("Arora's", 'fam-2');
+    store().switchFamily('fam-1');
+    expect(family().name).toBe("Khurana's");
+    store().switchFamily('not-mine');
     expect(family().name).toBe("Khurana's");
   });
 
-  it('an invited email joins the family when that person signs up', async () => {
-    await store().signUpWithEmail('Ayush', 'ayush@example.com', 'almari2026');
-    store().createFamily("Khurana's", you('Ayush Khurana'));
+  it('forgets a family the account left, and opens another', () => {
+    signedInFamily("Khurana's", 'fam-1');
+    signedInFamily("Arora's", 'fam-2');
+    store().forgetFamily('fam-2');
+    expect(store().families['fam-2']).toBeUndefined();
+    expect(store().cloud?.memberships['fam-2']).toBeUndefined();
+    expect(store().session.familyId).toBe('fam-1');
+  });
+
+  it('marks an invited email as invited, and announces privacy changes', () => {
+    signedInFamily();
     expect(store().saveMember({ kind: 'account', fullName: 'Riya Khurana', email: 'Riya@Example.com', ids: {} }).ok).toBe(true);
-    expect(family().members.find((m) => m.fullName === 'Riya Khurana')?.status).toBe('invited');
-    store().signOut();
-
-    await store().signUpWithEmail('Riya', 'riya@example.com', 'riya-pass-1');
-    const joined = store().joinPendingInvites();
-    expect(joined).toHaveLength(1);
-    expect(family().name).toBe("Khurana's");
-    expect(family().members.find((m) => m.id === viewer())?.fullName).toBe('Riya Khurana');
-  });
-
-  it('privacy changes are announced in the activity list', async () => {
-    await store().signUpWithEmail('Ayush', 'ayush@example.com', 'almari2026');
-    store().createFamily("Khurana's", you('Ayush Khurana'));
+    const riya = family().members.find((m) => m.fullName === 'Riya Khurana');
+    expect(riya).toMatchObject({ status: 'invited', email: 'riya@example.com' });
     store().setPersonalSharing('private');
     expect(family().personalSharing).toBe('private');
     expect(family().activity[0].text).toMatch(/private/);
   });
+
+  it('leaving takes the viewer’s personal items and member card with them', () => {
+    signedInFamily();
+    const me = viewer();
+    store().saveNote({ title: 'Mine', body: 'x', onlyMe: true });
+    store().saveDocument({ templateId: 'pan', title: 'My PAN', scope: 'personal', ownerId: me, onlyMe: false, files: [] });
+    store().saveDocument({ templateId: 'house-deed', title: 'Flat', scope: 'common', onlyMe: false, files: [] });
+    store().leaveLocally();
+    expect(family().notes).toHaveLength(0);
+    expect(family().documents.map((d) => d.title)).toEqual(['Flat']);
+    expect(family().members.some((m) => m.id === me)).toBe(false);
+  });
 });
 
 describe('documents and profile numbers', () => {
-  beforeEach(async () => {
-    await store().signUpWithEmail('Ayush', 'ayush@example.com', 'almari2026');
-    store().createFamily("Khurana's", you('Ayush Khurana'));
-  });
+  beforeEach(() => signedInFamily());
 
   it('a PAN document fills the profile, and editing the profile updates the document', () => {
     const me = viewer();
@@ -193,17 +171,17 @@ describe('removing a member needs a second member', () => {
 });
 
 describe('app PIN', () => {
-  it('five wrong PINs lock the app and ask for a sign-in; nothing is wiped', async () => {
-    await store().signUpWithEmail('Ayush', 'ayush@example.com', 'almari2026');
-    store().createFamily("Khurana's", you('Ayush Khurana'));
+  it('five wrong PINs lock the app until a sign-in; nothing is wiped', async () => {
+    signedInFamily();
     await store().setPin('2468');
     expect(await store().verifyPin('2468')).toEqual({ status: 'ok' });
     for (let left = 4; left >= 1; left--) {
       expect(await store().verifyPin('0000')).toEqual({ status: 'wrong', attemptsLeft: left });
     }
     expect(await store().verifyPin('0000')).toEqual({ status: 'locked-out' });
-    expect(store().session.accountId).toBeUndefined();
+    expect(store().device.lockedOut).toBe(true);
     expect(Object.keys(store().families)).toHaveLength(1);
+    expect(store().cloud?.userId).toBe('user-ayush');
   });
 });
 
@@ -218,14 +196,33 @@ describe('sample family', () => {
     store().exitSample();
     expect(store().families[SAMPLE_FAMILY_ID]).toBeUndefined();
   });
+
+  it('returns to the account’s own family after the sample', () => {
+    signedInFamily();
+    store().startSample();
+    store().exitSample();
+    expect(store().session.familyId).toBe('fam-1');
+  });
 });
 
-describe('saving to the phone', () => {
-  it('writes every change to storage', async () => {
-    await store().signUpWithEmail('Ayush', 'ayush@example.com', 'almari2026');
-    await new Promise((r) => setTimeout(r, 0));
+describe('saving on this device', () => {
+  it('writes changes to storage, without the loading flag', async () => {
+    signedInFamily();
+    await flushSaves();
     const saved = JSON.parse(mockMemory.get('almari-state') as string);
-    expect(Object.values(saved.state.accounts)).toHaveLength(1);
+    expect(saved.state.families['fam-1'].name).toBe("Khurana's");
+    expect(saved.state.cloud.userId).toBe('user-ayush');
     expect(saved.state.hydrated).toBeUndefined();
+  });
+
+  it('signing out wipes everything but the theme', async () => {
+    signedInFamily();
+    store().setTheme('dark');
+    const before = store().device.deviceId;
+    store().clearLocal();
+    expect(store().families).toEqual({});
+    expect(store().cloud).toBeUndefined();
+    expect(store().device.theme).toBe('dark');
+    expect(store().device.deviceId).not.toBe(before);
   });
 });

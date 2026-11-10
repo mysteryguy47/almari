@@ -61,9 +61,9 @@ export default function Welcome() {
         />
       </View>
       <View style={styles.note}>
-        <Stamp text="Prototype" tone="stamp" />
+        <Stamp text="Beta" tone="stamp" />
         <T variant="small" color="ink2" style={styles.flex}>
-          This early version keeps everything on this phone only and is not encrypted yet. Please use the sample family, or test papers, not real ones.
+          Almari is new and being tested with families. Everything is locked on your device before it is saved. Keep the paper originals safe as always.
         </T>
       </View>
     </Screen>

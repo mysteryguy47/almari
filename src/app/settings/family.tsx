@@ -16,6 +16,7 @@ import type { PersonalSharing } from '@/domain/types';
 import { checkFamilyName, LIMITS } from '@/domain/validation';
 import { useApp } from '@/store/app-store';
 import { useCtx } from '@/store/hooks';
+import * as cloudActions from '@/sync/actions';
 import { useTheme } from '@/theme/ThemeProvider';
 import { toast } from '@/store/ui-store';
 import { space } from '@/theme/tokens';
@@ -25,15 +26,15 @@ export default function FamilySettings() {
   const ctx = useCtx();
   const renameFamily = useApp((s) => s.renameFamily);
   const setPersonalSharing = useApp((s) => s.setPersonalSharing);
-  const approveRemoval = useApp((s) => s.approveRemoval);
-  const cancelRemoval = useApp((s) => s.cancelRemoval);
-  const leaveFamily = useApp((s) => s.leaveFamily);
   const { palette } = useTheme();
   const [name, setName] = useState(ctx?.family.name ?? '');
   const [pendingSharing, setPendingSharing] = useState<PersonalSharing>();
   const [leaving, setLeaving] = useState(false);
   if (!ctx) return <Redirect href="/" />;
   const { family, viewerId } = ctx;
+  const sample = !!family.isSample;
+  const approveRemoval = (memberId: string) => (sample ? Promise.resolve(useApp.getState().approveRemoval(memberId)) : cloudActions.approveRemoval(memberId));
+  const cancelRemoval = (memberId: string) => (sample ? Promise.resolve(useApp.getState().cancelRemoval(memberId)) : cloudActions.cancelRemoval(memberId));
 
   const nameCheck = checkFamilyName(name);
   return (
@@ -62,7 +63,7 @@ export default function FamilySettings() {
                   <T variant="small" color="ink2">Asked by {displayName(findMember(family, r.requestedBy))}.</T>
                   <View style={styles.row}>
                     {canApprove ? (
-                      <Button label="Approve" size="md" variant="danger" full={false} onPress={() => { const res = approveRemoval(r.memberId); toast(res.ok ? 'Removed' : res.error, { tone: res.ok ? 'success' : 'warn' }); }} testID="approve-removal" />
+                      <Button label="Approve" size="md" variant="danger" full={false} onPress={async () => { const res = await approveRemoval(r.memberId); toast(res.ok ? 'Removed' : res.error, { tone: res.ok ? 'success' : 'warn' }); }} testID="approve-removal" />
                     ) : (
                       <T variant="small" color="ink3">{r.requestedBy === viewerId ? 'You asked; someone else must approve.' : 'Waiting for another member.'}</T>
                     )}
@@ -118,9 +119,10 @@ export default function FamilySettings() {
         <SlideToConfirm
           label="Slide to leave"
           tone="sindoor"
-          onConfirm={() => {
+          onConfirm={async () => {
             setLeaving(false);
-            leaveFamily();
+            const result = await cloudActions.leaveFamily();
+            if (!result.ok) return toast(result.error, { tone: 'warn' });
             toast('You left the family');
             router.replace('/');
           }}

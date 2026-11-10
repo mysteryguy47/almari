@@ -28,6 +28,7 @@ import { OCR_AVAILABLE, OCR_UNAVAILABLE_REASON, recognize } from '@/lib/ocr';
 import { ORIGINAL_PLACES } from '@/lib/options';
 import { pickFromCamera, pickFromFiles, pickFromPhotos, type PickResult } from '@/lib/pick';
 import { useApp } from '@/store/app-store';
+import { initCrypto, randomKey, toB64 } from '@/lib/crypto';
 import { fileUrl, saveFile, type PickedFile } from '@/store/files';
 import { useCtx } from '@/store/hooks';
 import { newId } from '@/store/secrets';
@@ -216,7 +217,7 @@ export default function AddDocument() {
     if (!firstImage) return;
     setOcr({ state: 'reading' });
     try {
-      const uri = firstImage.kind === 'new' ? firstImage.picked.uri : await fileUrl(firstImage.ref.id, firstImage.ref.name);
+      const uri = firstImage.kind === 'new' ? firstImage.picked.uri : await fileUrl(firstImage.ref);
       const result = uri ? await recognize(uri) : null;
       if (!result) return setOcr({ state: 'failed' });
       setOcr({ state: 'done', suggestion: suggestFor(template.number?.kind, extractFromText(result.text), !!template.expiry) });
@@ -250,9 +251,16 @@ export default function AddDocument() {
       for (const slot of slots) {
         if (slot.kind === 'saved') files.push(slot.ref);
         else {
-          await saveFile(slot.id, slot.picked);
           const kind = fileKindOf(slot.picked.name, slot.picked.mime) ?? 'doc';
-          files.push({ id: slot.id, name: slot.picked.name, mime: slot.picked.mime ?? 'application/octet-stream', size: slot.picked.size ?? 0, kind });
+          const ref: FileRef = { id: slot.id, name: slot.picked.name, mime: slot.picked.mime ?? 'application/octet-stream', size: slot.picked.size ?? 0, kind };
+          // Papers of a real family are locked with their own key before they are stored or uploaded.
+          if (!family.isSample) {
+            await initCrypto();
+            ref.key = toB64(randomKey());
+            ref.familyId = family.id;
+          }
+          await saveFile(ref, slot.picked);
+          files.push(ref);
         }
       }
       const id = saveDocument({

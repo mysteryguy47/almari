@@ -3,6 +3,7 @@ import { StyleSheet, View } from 'react-native';
 
 import { Avatar } from '@/components/Bits';
 import { Button } from '@/components/Button';
+import { SyncLine } from '@/components/CloudStatus';
 import { Segmented } from '@/components/Fields';
 import { Card, Row, Screen, Section } from '@/components/Layout';
 import { T } from '@/components/Text';
@@ -10,6 +11,7 @@ import type { ThemePref } from '@/domain/types';
 import { useApp } from '@/store/app-store';
 import { useAccount, useCtx } from '@/store/hooks';
 import { useUi } from '@/store/ui-store';
+import { signOutAndForget } from '@/sync/account';
 import { space, TAB_BAR_HEIGHT } from '@/theme/tokens';
 
 export default function Settings() {
@@ -17,7 +19,7 @@ export default function Settings() {
   const account = useAccount();
   const theme = useApp((s) => s.device.theme);
   const setTheme = useApp((s) => s.setTheme);
-  const signOut = useApp((s) => s.signOut);
+  const kitMade = useApp((s) => !!s.cloud?.kitCreatedAt);
   const exitSample = useApp((s) => s.exitSample);
   if (!ctx) return null;
   const { family, viewer } = ctx;
@@ -32,6 +34,11 @@ export default function Settings() {
           <T variant="small" color="ink2">{sample ? 'Sample family member' : account?.email}</T>
         </View>
       </Card>
+      {!sample ? (
+        <View style={styles.sync}>
+          <SyncLine familyId={family.id} />
+        </View>
+      ) : null}
 
       <Section title="Look">
         <Segmented<ThemePref>
@@ -54,9 +61,11 @@ export default function Settings() {
 
       <Section title="You and this phone">
         <Card padded={false}>
-          {!sample ? <Row title="Sign-in" subtitle={account?.google ? (account.passwordHash ? 'Google and password' : 'Google. Add a password too?') : 'Email and password'} icon="Mail" tint="inland" onPress={() => router.push('/settings/sign-in')} testID="settings-sign-in" /> : null}
+          {!sample ? <Row title="Sign-in" subtitle={account?.google ? (account.hasPassword ? 'Google and password' : 'Google. Add a password too?') : 'Email and password'} icon="Mail" tint="inland" onPress={() => router.push('/settings/sign-in')} testID="settings-sign-in" /> : null}
           {!sample ? <Row title="App lock" subtitle="PIN and fingerprint" icon="Lock" tint="stamp" divider onPress={() => router.push('/settings/lock')} /> : null}
-          <Row title="About this prototype" subtitle="What works, what is coming, the fine print" icon="Info" tint="almari" divider={!sample} onPress={() => router.push('/settings/about')} />
+          {!sample ? <Row title="Recovery Kit" subtitle={kitMade ? 'Made. Keep it in the almari.' : 'Not made yet. It lets you back in if you lose every phone.'} icon="QrCode" tint={kitMade ? 'almari' : 'haldi'} divider onPress={() => router.push('/settings/kit')} testID="settings-kit" /> : null}
+          {!sample ? <Row title="Devices" subtitle="Where your family is signed in. Remove a lost phone." icon="Smartphone" tint="inland" divider onPress={() => router.push('/settings/devices')} testID="settings-devices" /> : null}
+          <Row title="About Almari" subtitle="How your papers are locked, what is coming, the fine print" icon="Info" tint="almari" divider={!sample} onPress={() => router.push('/settings/about')} />
           {!sample ? <Row title="Delete account" subtitle="In the app, any time" icon="Trash" danger divider onPress={() => router.push('/settings/account')} /> : null}
         </Card>
       </Section>
@@ -66,10 +75,13 @@ export default function Settings() {
         variant="secondary"
         icon="LogOut"
         testID="sign-out"
-        onPress={() => {
-          if (sample) exitSample();
-          else signOut();
-          useUi.getState().lock();
+        onPress={async () => {
+          if (sample) {
+            exitSample();
+            useUi.getState().lock();
+            return router.replace('/');
+          }
+          await signOutAndForget();
           router.replace('/welcome');
         }}
       />
@@ -79,5 +91,6 @@ export default function Settings() {
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  me: { flexDirection: 'row', alignItems: 'center', gap: space.md, marginBottom: space.xxl },
+  me: { flexDirection: 'row', alignItems: 'center', gap: space.md, marginBottom: space.md },
+  sync: { marginBottom: space.xxl, paddingHorizontal: space.sm },
 });

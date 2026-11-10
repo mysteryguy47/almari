@@ -138,6 +138,15 @@ import {
   Wrench as WrenchIcon,
   X as XIcon,
   Zap as ZapIcon,
+  Cloud as CloudIcon,
+  CloudOff as CloudOffIcon,
+  Laptop as LaptopIcon,
+  Link as LinkIcon,
+  LogIn as LogInIcon,
+  MessageCircle as MessageCircleIcon,
+  Printer as PrinterIcon,
+  QrCode as QrCodeIcon,
+  RefreshCw as RefreshCwIcon,
 } from 'lucide-react-native';
 
 import type { IconName } from '@/domain/icons';
@@ -277,4 +286,13 @@ export const ICONS: Record<IconName, LucideIcon> = {
   Wrench: WrenchIcon,
   X: XIcon,
   Zap: ZapIcon,
+  Cloud: CloudIcon,
+  CloudOff: CloudOffIcon,
+  Laptop: LaptopIcon,
+  Link: LinkIcon,
+  LogIn: LogInIcon,
+  MessageCircle: MessageCircleIcon,
+  Printer: PrinterIcon,
+  QrCode: QrCodeIcon,
+  RefreshCw: RefreshCwIcon,
 };

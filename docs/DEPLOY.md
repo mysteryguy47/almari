@@ -2,14 +2,12 @@
 
 ## What runs where
 
-Today the whole app, screens and rules alike, runs on the phone or in the browser. There is no server: data stays on the device. So going live today means hosting the web app's files, nothing more.
-
-The MVP adds a backend for sign-in, encrypted sync between family phones, file storage and push reminders. That backend is **Supabase** in Mumbai. No custom server is planned, so **Railway is not needed**. If a small server job comes up later (for example sending the morning reminders), Supabase Edge Functions with a schedule cover it.
+The app (screens and rules) runs on the phone or in the browser and keeps everything there, encrypted. The backend is **Supabase** in Mumbai: sign-in, the locked records, locked files and live updates between family phones. It never holds a key, so it cannot read anything. No custom server is needed, so **Railway is not needed**. If a small server job comes up later (for example sending the morning reminders), Supabase Edge Functions with a schedule cover it. The design is in [BACKEND.md](BACKEND.md).
 
 | Piece | Where | Cost to start |
 | --- | --- | --- |
 | Web app (iPhone, desktop, anyone with a link) | **Vercel**, from this GitHub repo | Hobby is free but for non-commercial use only. Move to Pro before charging money. |
-| Backend (MVP) | **Supabase**, region South Asia (Mumbai) | Free while building (free projects pause after a week without use). Pro for launch. |
+| Backend | **Supabase**, region South Asia (Mumbai) | Free while building (free projects pause after a week without use). Pro for launch. |
 | Android app | **EAS Build** makes it, **Play Console** ships it | EAS free tier is enough to start. You already have the Play account. |
 | iPhone | The Vercel web app, added to the Home Screen | Free. No Apple account needed. |
 
@@ -32,15 +30,48 @@ Notes
 - The first **Read from the photo** downloads the text-reading engine and its English data from a public CDN. The photo itself never leaves the device. Before launch these files should be served from our own domain (it is on the remaining-work list).
 - Expo's own EAS Hosting also works. Vercel is suggested because it deploys straight from GitHub with previews per branch.
 
-## 2. Backend on Supabase (when the MVP backend is built)
+## 2. Backend on Supabase (one time, about 15 minutes)
 
-The backend code (tables, row-level security, encryption, storage) is the next build step and is not in this repo yet. The project can be created now:
+The backend is built: tables, access rules and server functions are in `supabase/migrations/20261110120000_vault.sql`, tested by `npm run test:backend` against a local copy of Supabase. Your project needs it applied once, plus a few settings. Only you should type keys and passwords into the dashboards.
 
-1. supabase.com → **New project**. Name `almari`, region **South Asia (Mumbai)**. Choose a long database password and keep it in your password manager.
-2. **Project Settings → API Keys**: note the Project URL and the *publishable* key. These two are public by design. They go in Vercel as `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_KEY`, and locally in `.env.local` (git ignores it). The *secret* key never goes in the app or the repo.
-3. **Authentication → URL Configuration**: Site URL `https://almari.blackmonkey.in`; Redirect URLs `https://almari.blackmonkey.in/auth/callback` and `http://localhost:8081/auth/callback`.
-4. **Authentication → Emails → SMTP Settings**: Supabase's built-in email allows only a few messages an hour and is for testing. For real sign-up and reset emails, connect an email service (Amazon SES, Resend, Zoho and similar) sending from an address like `no-reply@blackmonkey.in`.
-5. Google sign-in: follow [GOOGLE-SIGN-IN.md](GOOGLE-SIGN-IN.md).
+**A. Create the database.** Supabase → your project → **SQL Editor → New query**. Paste the whole migration file and press **Run**. You should see "Success. No rows returned". Run it once only; a second run stops at "already exists", which is harmless.
+(Command-line alternative: `npx supabase login`, `npx supabase link --project-ref <your-ref>`, `npx supabase db push`.)
+
+**B. Addresses.** **Authentication → URL Configuration**:
+- Site URL: `https://almari.blackmonkey.in`
+- Redirect URLs: add `https://almari.blackmonkey.in/**` (covers sign-in, email confirmation and password reset). Add `http://localhost:8081/**` only if you run the app on your Mac against this project.
+
+**C. Email sign-in.** **Authentication → Sign In / Providers → Email**: keep **Confirm email** on, and set **Minimum password length** to 8.
+
+Supabase's built-in email sends only to members of your Supabase team, about 2 emails an hour. That is enough to test with your own email. To let family members test before you connect an email service:
+- either turn **Confirm email** off for now (sign-up then signs in at once; turn it back on before real users), or
+- connect an email service under **Authentication → Emails → SMTP Settings** (Amazon SES, Resend, Zoho and similar), sending from an address like `no-reply@blackmonkey.in`. Password-reset emails need this too.
+
+**D. Optional: links that work on any device.** By default an email link must be opened in the same browser that asked for it (otherwise the app says "Done. Now sign in on this device", which still works). To make links work anywhere, edit two templates under **Authentication → Emails → Templates**, replacing the link in each:
+- Confirm sign up: `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email`
+- Reset password: `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=recovery`
+
+**E. Google.** Already set up. Check the Google web client's *Authorized JavaScript origins* includes `https://almari.blackmonkey.in`, and its redirect URI is the callback URL shown on Supabase's Google provider page.
+
+**F. Connect the web app.** Supabase → **Project Settings → API Keys**: copy the Project URL and the *publishable* key (`sb_publishable_…`; the older *anon* key also works). In Vercel → your project → **Settings → Environment Variables**, add for Production and Preview:
+- `EXPO_PUBLIC_SUPABASE_URL` = the Project URL
+- `EXPO_PUBLIC_SUPABASE_KEY` = the publishable key
+
+Both are public by design (they ship inside the web app); the access rules protect the data. Never put the *secret* key anywhere in the app or the repo. Then **Deployments → the latest → Redeploy**: the app reads these when it is built.
+
+**G. Try it.** Open `https://almari.blackmonkey.in` in a private window: create an account, confirm the email, make a family, add a paper, invite someone with the link. In Supabase → **Table Editor → records**, every row is locked text: no names, numbers or titles.
+
+### Running it on your Mac
+
+```bash
+npx supabase start
+```
+
+```bash
+npx supabase db reset
+```
+
+Then create `.env.local` from `.env.local.example` with the URL and publishable key that `npx supabase status` prints, and run `npx expo start --web`. Sign-up and reset emails land in the local mailbox at http://127.0.0.1:54324. `npm run test:backend` runs the server tests.
 
 ## 3. Android app (EAS Build, then Play Console)
 

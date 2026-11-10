@@ -1,6 +1,6 @@
 # Google sign-in, step by step
 
-**Status.** The prototype has a stand-in screen (`src/app/auth/google.tsx`) that asks for a name and Gmail. Real Google sign-in arrives with the Supabase backend. Parts A and B (the consoles) can be done any time. Part C (the code) lands with the backend build.
+**Status.** Web: built (`signInWithGoogle` and `/auth/callback` in `src/sync/account.ts` and `src/app/auth/`), and checked locally as far as Google's page. Android: Part A's Android clients and Part C's native code wait for the Android development build (it needs an Expo account, hence the username prompt from `eas credentials`).
 
 Only you should type client secrets and keys. They go into the Google and Supabase consoles and your password manager. They never go into this repo, the app, or a chat.
 
@@ -40,7 +40,7 @@ Optional, before launch: a Supabase custom domain such as `auth.blackmonkey.in` 
 3. **Client Secret**: the web client's secret.
 4. **Skip nonce check**: leave it off. The Android library's token carries no nonce, and Supabase accepts that.
 5. Copy the **Callback URL** shown on this page into the Google web client's redirect URIs (Part A, step 5).
-6. **Authentication → URL Configuration**: Site URL `https://almari.blackmonkey.in`. Redirect URLs `https://almari.blackmonkey.in/auth/callback` and `http://localhost:8081/auth/callback`.
+6. **Authentication → URL Configuration**: Site URL `https://almari.blackmonkey.in`. Redirect URLs `https://almari.blackmonkey.in/**` (and `http://localhost:8081/**` for local work).
 
 **Same email, two ways in.** Supabase links sign-ins that share a verified email. Someone who signed up with email and password, and later taps Google with the same Gmail, lands in the same account.
 

@@ -2,6 +2,8 @@
  * Hooks that read the current family. Selectors return stored objects (stable
  * references), never fresh arrays, so screens re-render only on real changes.
  */
+import { useMemo } from 'react';
+
 import { findMember } from '@/domain/access';
 import type { Account, Family, ID, Member } from '@/domain/types';
 
@@ -15,8 +17,21 @@ export function useViewerId(): ID | undefined {
   return useApp(viewerIdOf);
 }
 
+/** The signed-in person, or undefined when signed out. */
 export function useAccount(): Account | undefined {
-  return useApp((s) => (s.session.accountId ? s.accounts[s.session.accountId] : undefined));
+  const cloud = useApp((s) => s.cloud);
+  return useMemo(
+    () =>
+      cloud
+        ? { id: cloud.userId, email: cloud.email, name: cloud.name, google: cloud.google, hasPassword: cloud.hasPassword, familyIds: Object.keys(cloud.memberships) }
+        : undefined,
+    [cloud],
+  );
+}
+
+/** This device holds the account's current key, so it can open and sync the family. */
+export function useDeviceReady(): boolean {
+  return useApp((s) => !!s.cloud && s.cloud.currentVersion > 0 && s.cloud.keyring.some((k) => k.version === s.cloud?.currentVersion));
 }
 
 export interface Ctx {

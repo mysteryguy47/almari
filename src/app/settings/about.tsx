@@ -6,49 +6,35 @@ import { Card, Screen, Section } from '@/components/Layout';
 import { T } from '@/components/Text';
 import { space } from '@/theme/tokens';
 
-const WORKS = [
-  'Sign up with email, or a stand-in for Google; add a password to a Google account; five-try pause and reset',
-  'Families: name, members (with or without email), pets, in loving memory, up to 3 families per person',
-  'Personal papers shared or private, Only me items, no admin, removals need a second member',
-  '121 document templates, camera / photos / files up to 10 MB, front and back, profile numbers filled in',
-  'Passwords, many bank accounts, credit cards without an account, card bills and limits',
-  'Family to-do with deadlines, repeat, nudges, and the renew-the-paper loop',
-  'Reminders for everyone by default, with opt-outs; private papers remind only their owner',
-  'App PIN with five-try lock, fingerprint on Android, re-check before secrets',
-  'Search that understands typos and Hinglish, readiness check, Family ID sheet, emergency cards',
-  'Day, Night, or like the phone',
+const LOCKED = [
+  'Every paper, number, password and file is encrypted on your device before it is saved or sent, with keys that never leave your family’s devices (libsodium: XChaCha20-Poly1305 and X25519).',
+  'Our server in Mumbai stores only locked boxes, plus what it needs to route them: emails, who is in which family, sizes and times.',
+  'Shared items open for everyone in the family; Only me items open only for you. Making an item private seals it for you alone.',
+  'A new phone is let in by your other device or a family member, after both screens show the same six symbols, or by your printed Recovery Kit.',
+  'On this device, everything Almari saves is encrypted with a key the browser keeps and never lets out.',
 ];
 
-const COMING = [
-  'Real Google sign-in and a server in Mumbai (Supabase)',
-  'End-to-end encryption of everything, on the phone and in the cloud',
-  'Sync across the family’s phones, and recovery through the family or a printed kit',
-  'Phone notifications (Android) and web push (iPhone web app)',
-  'Document scanner with edge detection, photo compression, HEIC to JPG, PDF merge',
-  'Hindi, then other Indian languages',
-  'Export everything as readable folders',
+const LIMITS = [
+  'If you lose every device, have no Recovery Kit and nobody in your family can approve you, your Only me items cannot be recovered. That is the price of “even we cannot read it”.',
+  'Encryption protects the family from outsiders, not from choices inside it: a member can forward what is shared with them.',
+  'Making an item private later removes it from others’ phones at their next sync, but cannot recall a copy already shared.',
+  'Phone notifications, the Android app, Hindi and an independent security audit are still to come.',
 ];
 
 export default function About() {
   return (
-    <Screen title="About this prototype" testID="about">
+    <Screen title="About Almari" testID="about">
       <View style={styles.hero}>
         <AlmariArt size={72} />
         <T variant="title">Almari</T>
         <T variant="small" color="ink2">Ghar ke saare kaagaz, ek jagah.</T>
-        <Stamp text="Prototype · Nov 2026" />
+        <Stamp text="Beta · 2026" />
       </View>
-      <Card style={styles.warn}>
-        <T variant="bodyStrong" color="sindoor">Please do not store real documents yet</T>
-        <T variant="small" color="ink2">
-          In this prototype everything stays on this phone or browser only, without encryption, and sign-in is simulated. Use the sample family or test papers.
-        </T>
-      </Card>
-      <Section title="Works in this prototype">
-        <Card style={styles.list}>{WORKS.map((w) => <T key={w} variant="small">• {w}</T>)}</Card>
+      <Section title="How your papers are locked">
+        <Card style={styles.list}>{LOCKED.map((w) => <T key={w} variant="small">• {w}</T>)}</Card>
       </Section>
-      <Section title="Coming in the full app">
-        <Card style={styles.list}>{COMING.map((w) => <T key={w} variant="small" color="ink2">• {w}</T>)}</Card>
+      <Section title="Honest limits">
+        <Card style={styles.list}>{LIMITS.map((w) => <T key={w} variant="small" color="ink2">• {w}</T>)}</Card>
       </Section>
       <Section title="Fine print">
         <Card style={styles.list}>
@@ -62,6 +48,5 @@ export default function About() {
 
 const styles = StyleSheet.create({
   hero: { alignItems: 'center', gap: space.sm, marginBottom: space.xl },
-  warn: { gap: space.sm, marginBottom: space.xxl },
   list: { gap: space.sm },
 });

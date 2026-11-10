@@ -62,7 +62,7 @@ export default function Reminders() {
             <T variant="small" color="ink2" style={styles.pad}>No reminders scheduled.</T>
           )}
         </Card>
-        <T variant="small" color="ink3">Quiet hours 10 pm to 8 am. In this prototype these show here; phone notifications arrive with the full app.</T>
+        <T variant="small" color="ink3">Quiet hours 10 pm to 8 am. For now reminders show here; phone notifications come with the Android app and iPhone web push.</T>
       </Section>
       <Row title="Choose what you are reminded about" icon="Settings" onPress={() => router.push('/settings/reminders')} />
     </Screen>

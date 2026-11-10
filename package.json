@@ -6,6 +6,8 @@
     "@expo-google-fonts/anek-latin": "^0.4.2",
     "@expo-google-fonts/eczar": "^0.4.1",
     "@expo/ui": "~58.0.27",
+    "@scure/bip39": "^2.4.0",
+    "@supabase/supabase-js": "^2.119.0",
     "expo": "~58.0.23",
     "expo-clipboard": "~58.0.4",
     "expo-constants": "~58.0.15",
@@ -29,8 +31,11 @@
     "expo-system-ui": "~58.0.7",
     "expo-web-browser": "~58.0.7",
     "immer": "^11.2.9",
+    "jsqr": "^1.4.0",
+    "libsodium-wrappers": "^0.8.4",
     "lucide-react-native": "^1.70.0",
     "pdf-lib": "^1.17.1",
+    "qrcode": "^1.5.4",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "react-native": "0.88.1",
@@ -48,6 +53,8 @@
   "devDependencies": {
     "@testing-library/react-native": "^14.1.0",
     "@types/jest": "^30.0.0",
+    "@types/libsodium-wrappers": "^0.7.14",
+    "@types/qrcode": "^1.5.6",
     "@types/react": "~19.3.0",
     "eslint": "^9.0.0",
     "eslint-config-expo": "~58.0.4",
@@ -63,6 +70,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "expo lint",
     "check": "npm run typecheck && npm run lint && npm test -- --silent",
+    "test:backend": "jest -c jest.backend.config.js --runInBand",
     "export:web": "expo export -p web"
   },
   "private": true,
@@ -71,8 +79,12 @@
     "testMatch": [
       "**/*.test.ts?(x)"
     ],
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "<rootDir>/tests/backend/"
+    ],
     "transformIgnorePatterns": [
-      "node_modules/(?!((jest-)?react-native|@react-native(-community)?|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|react-native-svg|lucide-react-native|zustand|immer))"
+      "node_modules/(?!((jest-)?react-native|@react-native(-community)?|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|react-native-svg|lucide-react-native|zustand|immer|@scure/.*|@noble/.*))"
     ],
     "moduleNameMapper": {
       "^@/assets/(.*)$": "<rootDir>/assets/$1",

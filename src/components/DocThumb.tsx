@@ -21,7 +21,7 @@ export function useFileUrl(file: FileRef | undefined): string | null {
   useEffect(() => {
     let alive = true;
     if (!file || file.kind === 'sample') return;
-    fileUrl(file.id, file.name)
+    fileUrl(file)
       .then((url) => alive && setLoaded({ id: file.id, url }))
       .catch(() => alive && setLoaded({ id: file.id, url: null }));
     return () => {

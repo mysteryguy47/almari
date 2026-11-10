@@ -73,7 +73,8 @@ export function AppLock() {
   const [bioReady, setBioReady] = useState(false);
   const { submit, message } = usePinCheck(unlock);
 
-  const active = !!ctx && pinSet && !ctx.family.isSample;
+  const lockedOut = useApp((s) => !!s.device.lockedOut);
+  const active = !!ctx && pinSet && !ctx.family.isSample && !lockedOut;
 
   useEffect(() => {
     const sub = AppState.addEventListener('change', (state) => {
@@ -119,7 +120,10 @@ export function AppLock() {
       />
       <Pressable
         onPress={() => {
-          useApp.getState().signOut();
+          // Signing in again unlocks this device; nothing is deleted.
+          useApp.setState((d) => {
+            d.device.lockedOut = true;
+          });
           router.replace('/auth/sign-in');
         }}
         accessibilityRole="button"
