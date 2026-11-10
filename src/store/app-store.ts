@@ -116,6 +116,7 @@ export interface AppState extends PersistedState {
   purgeDeleted(now?: number): void;
   toggleMute(collection: 'documents' | 'cards', id: ID): void;
   setReminderPrefs(patch: Partial<ReminderPrefs>): void;
+  dismissNudge(key: string): void;
 
   // ---- tasks and numbers
   saveTask(input: TaskInput): Result<ID>;
@@ -665,6 +666,13 @@ export const useApp = create<AppState>()(
           onFamily((family, viewer) => {
             const current = family.reminderPrefs[viewer] ?? { familyMuted: false, mutedCategories: [] };
             family.reminderPrefs[viewer] = { ...current, ...patch };
+          });
+        },
+
+        dismissNudge(key) {
+          onFamily((family) => {
+            const list = family.dismissedNudges ?? [];
+            if (!list.includes(key)) family.dismissedNudges = [...list, key];
           });
         },
 

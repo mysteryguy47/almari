@@ -117,6 +117,15 @@ export default function DocumentView() {
         <View style={styles.flex}><Button label="Edit" icon="PenLine" variant="secondary" onPress={() => router.push({ pathname: '/doc/new', params: { id: doc.id } })} testID="doc-edit" /></View>
       </View>
 
+      {file?.kind === 'image' ? (
+        <View style={styles.actions}>
+          {isAadhaar ? (
+            <View style={styles.flex}><Button label="Masked copy" icon="EyeOff" variant="secondary" size="md" onPress={() => router.push({ pathname: '/doc/mask', params: { id: doc.id, file: String(doc.files.indexOf(file)) } })} testID="doc-mask" /></View>
+          ) : null}
+          <View style={styles.flex}><Button label="Resize for a form" icon="Image" variant="secondary" size="md" onPress={() => router.push({ pathname: '/doc/export', params: { id: doc.id, file: String(doc.files.indexOf(file)) } })} testID="doc-export" /></View>
+        </View>
+      ) : null}
+
       {doc.number ? (
         <Card style={styles.block}>
           <ValueRow
@@ -143,6 +152,7 @@ export default function DocumentView() {
           <Detail label="For" value={owner ? owner.fullName : 'The whole family'} />
           {doc.issueDate ? <Detail label="Issued" value={formatDate(doc.issueDate)} /> : null}
           {doc.expiryDate ? <Detail label={template.expiry?.label ?? 'Expires'} value={`${formatDate(doc.expiryDate)} (${relativeDays(days as number)})`} tone={days !== null && days < 0 ? 'sindoor' : undefined} /> : null}
+          {template.nominee ? <Detail label="Nominee" value={doc.nominee || 'Not noted. Worth adding: it makes a claim simple.'} tone={doc.nominee ? undefined : 'sindoor'} /> : null}
           <Detail label="Original kept at" value={doc.original || 'Not noted yet. Add it, future you will thank you.'} />
           {doc.description ? <Detail label="Note" value={doc.description} /> : null}
           <Detail label="Added by" value={`${displayName(findMember(family, doc.createdBy))}, ${formatDate(new Date(doc.createdAt).toISOString().slice(0, 10))}`} />

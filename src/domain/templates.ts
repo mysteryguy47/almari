@@ -67,6 +67,8 @@ export interface Template {
   issueDate?: boolean;
   /** The profile ID number this document fills. */
   profileId?: IdKind;
+  /** Has a nominee worth recording (deposits, policies, investments). */
+  nominee?: boolean;
   synonyms?: string[];
 }
 
@@ -143,7 +145,7 @@ export const TEMPLATES: readonly Template[] = [
   t('experience-letter', 'Experience letter', 'work', 'Mail', 'a4', {}),
   t('salary-slip', 'Salary slip', 'work', 'IndianRupee', 'a4', { synonyms: ['payslip', 'pay slip', 'tankhwah'] }),
   t('form-16', 'Form 16', 'work', 'FileText', 'a4', { synonyms: ['tds'] }),
-  t('pf-passbook', 'PF passbook', 'work', 'PiggyBank', 'a4', { number: { label: 'UAN' }, synonyms: ['epf', 'uan', 'provident fund'] }),
+  t('pf-passbook', 'PF passbook', 'work', 'PiggyBank', 'a4', { nominee: true, number: { label: 'UAN' }, synonyms: ['epf', 'uan', 'provident fund'] }),
   t('esic-card', 'ESIC card', 'work', 'IdCard', 'card', { number: { label: 'Insurance number' } }),
   t('ppo', 'Pension Payment Order (PPO)', 'work', 'Landmark', 'a4', { number: { label: 'PPO number' }, synonyms: ['pension', 'ppo'] }),
   t('professional-registration', 'Professional registration', 'work', 'Award', 'card', { number: { label: 'Registration number' }, expiry: VALID_TILL, synonyms: ['bar council', 'icai', 'medical council'] }),
@@ -165,14 +167,14 @@ export const TEMPLATES: readonly Template[] = [
   // ------------------------------------------------ Money
   t('passbook', 'Passbook first page', 'money', 'BookOpen', 'a4', { number: { label: 'Account number' }, synonyms: ['bank passbook'] }),
   t('cancelled-cheque', 'Cancelled cheque', 'money', 'Banknote', 'a4', { number: { label: 'Account number' }, synonyms: ['cheque'] }),
-  t('fd-receipt', 'Fixed deposit receipt', 'money', 'PiggyBank', 'a4', { number: { label: 'FD number' }, expiry: { label: 'Matures on' }, synonyms: ['fd', 'fixed deposit'] }),
-  t('ppf-passbook', 'PPF passbook', 'money', 'BookOpen', 'a4', { number: { label: 'PPF account number' }, expiry: { label: 'Matures on' } }),
-  t('sukanya-passbook', 'Sukanya Samriddhi passbook', 'money', 'BookOpen', 'a4', { number: { label: 'Account number' }, synonyms: ['ssy'] }),
-  t('post-office-passbook', 'Post-office passbook', 'money', 'BookOpen', 'a4', { number: { label: 'Account number' }, synonyms: ['dak ghar', 'kvp', 'nsc', 'rd'] }),
-  t('nps', 'NPS (PRAN card)', 'money', 'IdCard', 'card', { number: { label: 'PRAN' }, synonyms: ['pran', 'pension'] }),
-  t('demat', 'Demat account statement', 'money', 'TrendingUp', 'a4', { number: { label: 'Demat ID' }, synonyms: ['shares', 'stocks', 'dp id'] }),
-  t('mutual-fund', 'Mutual fund statement', 'money', 'ChartPie', 'a4', { number: { label: 'Folio number' }, synonyms: ['mf', 'sip', 'folio'] }),
-  t('life-insurance', 'Life insurance policy', 'money', 'Umbrella', 'a4', { number: { label: 'Policy number' }, expiry: { label: 'Next premium due' }, synonyms: ['lic', 'term plan', 'jeevan bima', 'bima'] }),
+  t('fd-receipt', 'Fixed deposit receipt', 'money', 'PiggyBank', 'a4', { nominee: true, number: { label: 'FD number' }, expiry: { label: 'Matures on' }, synonyms: ['fd', 'fixed deposit'] }),
+  t('ppf-passbook', 'PPF passbook', 'money', 'BookOpen', 'a4', { nominee: true, number: { label: 'PPF account number' }, expiry: { label: 'Matures on' } }),
+  t('sukanya-passbook', 'Sukanya Samriddhi passbook', 'money', 'BookOpen', 'a4', { nominee: true, number: { label: 'Account number' }, synonyms: ['ssy'] }),
+  t('post-office-passbook', 'Post-office passbook', 'money', 'BookOpen', 'a4', { nominee: true, number: { label: 'Account number' }, synonyms: ['dak ghar', 'kvp', 'nsc', 'rd'] }),
+  t('nps', 'NPS (PRAN card)', 'money', 'IdCard', 'card', { nominee: true, number: { label: 'PRAN' }, synonyms: ['pran', 'pension'] }),
+  t('demat', 'Demat account statement', 'money', 'TrendingUp', 'a4', { nominee: true, number: { label: 'Demat ID' }, synonyms: ['shares', 'stocks', 'dp id'] }),
+  t('mutual-fund', 'Mutual fund statement', 'money', 'ChartPie', 'a4', { nominee: true, number: { label: 'Folio number' }, synonyms: ['mf', 'sip', 'folio'] }),
+  t('life-insurance', 'Life insurance policy', 'money', 'Umbrella', 'a4', { nominee: true, number: { label: 'Policy number' }, expiry: { label: 'Next premium due' }, synonyms: ['lic', 'term plan', 'jeevan bima', 'bima'] }),
   t('loan-papers', 'Loan papers', 'money', 'HandCoins', 'a4', { number: { label: 'Loan account number' }, expiry: { label: 'Loan ends' }, synonyms: ['emi', 'karza'] }),
   t('itr', 'ITR acknowledgement', 'money', 'ReceiptText', 'a4', { number: { label: 'Acknowledgement number' }, synonyms: ['income tax return', 'itr v'] }),
 
@@ -278,6 +280,19 @@ export const OTHER_CATEGORY: Category = {
 
 export function getTemplate(id: string): Template {
   return BY_ID.get(id) ?? CUSTOM_TEMPLATE;
+}
+
+/** First words that are names, so they keep their capital mid-sentence. */
+const PROPER_FIRST_WORDS = new Set(['Aadhaar', 'Ayushman', 'Sukanya', 'Udyam', 'Kisan', 'Form', 'Pension', 'Import']);
+
+/**
+ * A template name as it reads after "My" or "Mummy’s": "driving licence",
+ * "passport-size photo", but "Aadhaar", "PAN card" and "Form 16" unchanged.
+ */
+export function nameInSentence(name: string): string {
+  const first = name.split(/[\s/]/)[0] ?? '';
+  if (!first || PROPER_FIRST_WORDS.has(first) || /[A-Z]/.test(first.slice(1))) return name;
+  return name.charAt(0).toLowerCase() + name.slice(1);
 }
 
 export function getCategory(id: string): Category {

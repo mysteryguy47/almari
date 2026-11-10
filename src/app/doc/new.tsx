@@ -15,17 +15,20 @@ import { displayName, findMember, visibleTo } from '@/domain/access';
 import { readiness } from '@/domain/family-rules';
 import { searchEntries, templateEntries } from '@/domain/search';
 import {
-  CATEGORIES, CUSTOM_TEMPLATE, getCategory, getTemplate, scopeOfTemplate, TEMPLATES, templatesIn, type CategoryId, type Template,
+  CATEGORIES, CUSTOM_TEMPLATE, getCategory, getTemplate, nameInSentence, scopeOfTemplate, TEMPLATES, templatesIn, type CategoryId, type Template,
 } from '@/domain/templates';
 import type { FileRef } from '@/domain/types';
 import {
   checkAadhaar, checkDocDescription, checkDocTitle, checkDrivingLicence, checkFile, checkIfsc, checkPan, checkPassport,
   checkVoterId, compactUpper, digitsOnly, fileKindOf, formatBytes, LIMITS, OK, type Check,
 } from '@/domain/validation';
+import { extractFromText, suggestFor, type Suggestion } from '@/domain/extract';
+import { formatDate } from '@/domain/dates';
+import { OCR_AVAILABLE, OCR_UNAVAILABLE_REASON, recognize } from '@/lib/ocr';
 import { ORIGINAL_PLACES } from '@/lib/options';
 import { pickFromCamera, pickFromFiles, pickFromPhotos, type PickResult } from '@/lib/pick';
 import { useApp } from '@/store/app-store';
-import { saveFile, type PickedFile } from '@/store/files';
+import { fileUrl, saveFile, type PickedFile } from '@/store/files';
 import { useCtx } from '@/store/hooks';
 import { newId } from '@/store/secrets';
 import { toast } from '@/store/ui-store';
@@ -161,6 +164,9 @@ export default function AddDocument() {
   const [issueDate, setIssueDate] = useState<string | undefined>(renew ? undefined : existing?.issueDate);
   const [expiryDate, setExpiryDate] = useState<string | undefined>(renew ? undefined : existing?.expiryDate);
   const [original, setOriginal] = useState(existing?.original ?? '');
+  const [nominee, setNominee] = useState(existing?.nominee ?? '');
+  const [ocr, setOcr] = useState<{ state: 'idle' | 'reading' | 'done' | 'failed'; suggestion?: Suggestion }>({ state: 'idle' });
+  const [dateKey, setDateKey] = useState(0);
   const [description, setDescription] = useState(existing?.description ?? '');
   const [onlyMe, setOnlyMe] = useState(existing?.onlyMe ?? false);
   const [tried, setTried] = useState(false);
@@ -191,7 +197,7 @@ export default function AddDocument() {
   const effectiveOwner = common || ownerId === FAMILY ? undefined : ownerId;
   const owner = effectiveOwner ? findMember(family, effectiveOwner) : undefined;
   const suggestedTitle = owner
-    ? `${owner.id === viewerId ? 'My' : `${displayName(owner)}’s`} ${template.id === 'custom' ? 'document' : template.name}`.slice(0, LIMITS.docTitle)
+    ? `${owner.id === viewerId ? 'My' : `${displayName(owner)}’s`} ${template.id === 'custom' ? 'document' : nameInSentence(template.name)}`.slice(0, LIMITS.docTitle)
     : template.id === 'custom' ? '' : template.name.slice(0, LIMITS.docTitle);
   const shownTitle = titleEdited ? title : suggestedTitle;
 
@@ -204,6 +210,20 @@ export default function AddDocument() {
   const duplicate = number && template.profileId
     ? visibleTo(family, viewerId, family.documents).find((d) => d.id !== existing?.id && d.templateId === template.id && d.ownerId === effectiveOwner && compactUpper(digitsOnly(d.number ?? '') || (d.number ?? '')) === compactUpper(digitsOnly(number) || number))
     : undefined;
+
+  const firstImage = slots.find((sl) => (sl.kind === 'new' ? fileKindOf(sl.picked.name, sl.picked.mime) === 'image' : sl.ref.kind === 'image'));
+  const readPhoto = async () => {
+    if (!firstImage) return;
+    setOcr({ state: 'reading' });
+    try {
+      const uri = firstImage.kind === 'new' ? firstImage.picked.uri : await fileUrl(firstImage.ref.id, firstImage.ref.name);
+      const result = uri ? await recognize(uri) : null;
+      if (!result) return setOcr({ state: 'failed' });
+      setOcr({ state: 'done', suggestion: suggestFor(template.number?.kind, extractFromText(result.text), !!template.expiry) });
+    } catch {
+      setOcr({ state: 'failed' });
+    }
+  };
 
   const addFile = async (pick: () => Promise<PickResult>) => {
     setFileError(undefined);
@@ -247,6 +267,7 @@ export default function AddDocument() {
         issueDate,
         expiryDate,
         original: original.trim() || undefined,
+        nominee: template.nominee ? nominee.trim() || undefined : undefined,
         files,
       });
       toast(existing ? (renew ? 'Renewed. The reminder starts again.' : 'Saved') : 'Saved. Safe in the almari.', { tone: 'success' });
@@ -302,6 +323,42 @@ export default function AddDocument() {
         )}
       </Section>
 
+      {(template.number || template.expiry) && firstImage ? (
+        <Card style={styles.ocr}>
+          {OCR_AVAILABLE ? (
+            <>
+              <Button
+                label={ocr.state === 'reading' ? 'Reading the photo…' : 'Read the number from the photo'}
+                icon="ScanLine"
+                variant="secondary"
+                size="md"
+                loading={ocr.state === 'reading'}
+                onPress={readPhoto}
+                testID="ocr-read"
+              />
+              {ocr.state === 'done' && ocr.suggestion ? (
+                <View style={styles.ocrFound}>
+                  {ocr.suggestion.number ? (
+                    <Chip testID="ocr-use-number" icon="Check" label={`Use ${ocr.suggestion.number}`} onPress={() => setNumber(ocr.suggestion?.number ?? '')} />
+                  ) : null}
+                  {ocr.suggestion.expiryDate && template.expiry ? (
+                    <Chip testID="ocr-use-expiry" icon="Check" label={`${template.expiry.label} ${formatDate(ocr.suggestion.expiryDate)}`} onPress={() => { setExpiryDate(ocr.suggestion?.expiryDate); setDateKey((k) => k + 1); }} />
+                  ) : null}
+                  {ocr.suggestion.issueDate && template.issueDate ? (
+                    <Chip icon="Check" label={`Issued ${formatDate(ocr.suggestion.issueDate)}`} onPress={() => { setIssueDate(ocr.suggestion?.issueDate); setDateKey((k) => k + 1); }} />
+                  ) : null}
+                  {!ocr.suggestion.number && !ocr.suggestion.expiryDate ? <T variant="small" color="ink2">No number found. A sharper, straight photo helps, or type it in.</T> : null}
+                </View>
+              ) : null}
+              {ocr.state === 'failed' ? <T variant="small" color="sindoor">Could not read the photo. Type the number in.</T> : null}
+              <T variant="small" color="ink3">Read on this device. Check what it finds before saving.</T>
+            </>
+          ) : (
+            <T variant="small" color="ink3">{OCR_UNAVAILABLE_REASON}</T>
+          )}
+        </Card>
+      ) : null}
+
       <TextField
         label="Title"
         value={shownTitle}
@@ -327,15 +384,20 @@ export default function AddDocument() {
           testID="doc-number"
         />
       ) : null}
-      {template.issueDate ? <DateField label="Issued on" value={issueDate} onChange={setIssueDate} testID="doc-issue" /> : null}
+      {template.issueDate ? <DateField key={`issue-${dateKey}`} label="Issued on" value={issueDate} onChange={setIssueDate} testID="doc-issue" /> : null}
       {template.expiry ? (
         <DateField
+          key={`expiry-${dateKey}`}
           label={template.expiry.label}
           value={expiryDate}
           onChange={setExpiryDate}
           helper={template.expiry.rule?.months ? 'Reminders 9 and 3 months before, for visa rules' : 'Reminders 30, 7 and 1 day before'}
           testID="doc-expiry"
         />
+      ) : null}
+
+      {template.nominee ? (
+        <TextField label="Nominee" value={nominee} onChangeText={setNominee} placeholder="Who receives it, as written on the form" helper="The money map flags accounts and policies without one" testID="doc-nominee" />
       ) : null}
 
       <Section title="Where is the original kept?">
@@ -371,4 +433,6 @@ const styles = StyleSheet.create({
   fileIcon: { alignItems: 'center', justifyContent: 'center' },
   remove: { padding: space.sm },
   onlyMe: { marginBottom: space.lg },
+  ocr: { gap: space.sm, marginBottom: space.lg },
+  ocrFound: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },
 });

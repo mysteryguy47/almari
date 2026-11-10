@@ -109,6 +109,8 @@ export interface DocItem extends Ownable {
   expiryDate?: string;
   /** Where the paper original is kept: "Steel almari, top shelf". */
   original?: string;
+  /** For accounts, deposits, policies and investments: who is the nominee. */
+  nominee?: string;
   files: FileRef[];
   /** Members who muted reminders for this document. */
   mutedBy: ID[];
@@ -251,6 +253,8 @@ export interface Family {
   activity: ActivityEntry[];
   reminderPrefs: Record<ID, ReminderPrefs>;
   removalRequests: RemovalRequest[];
+  /** Life-stage suggestions someone dismissed ("memberId:rule:year"). */
+  dismissedNudges?: string[];
   /** True for the built-in sample family. */
   isSample?: boolean;
 }

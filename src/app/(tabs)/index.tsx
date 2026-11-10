@@ -4,6 +4,7 @@ import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { Avatar, IconTile, Nameplate, Stamp } from '@/components/Bits';
 import { FamilySwitcher, ViewAsSheet } from '@/components/FamilySheets';
+import { NudgeCards } from '@/components/Nudges';
 import { Icon } from '@/components/Icon';
 import { Card, Row, Screen, Section, Tile } from '@/components/Layout';
 import { Pressy } from '@/components/Pressy';
@@ -11,6 +12,7 @@ import { T } from '@/components/Text';
 import { displayName, familyRow, findMember, firstName, visibleTo } from '@/domain/access';
 import { relativeDays } from '@/domain/dates';
 import { establishedYear, readiness } from '@/domain/family-rules';
+import { lifeStageNudges } from '@/domain/nudges';
 import { attentionFor } from '@/domain/reminders';
 import { COMMON_CATEGORIES, getTemplate } from '@/domain/templates';
 import { attentionHref, stampFor } from '@/lib/attention';
@@ -38,6 +40,7 @@ export default function Home() {
     const docs = visibleTo(family, viewerId, family.documents);
     return {
       attention: attentionFor(family, viewerId),
+      nudges: lifeStageNudges(family),
       people: familyRow(family),
       ready: readiness(family, viewerId),
       counts: Object.fromEntries(COMMON_CATEGORIES.map((c) => [c.id, docs.filter((d) => !d.ownerId && getTemplate(d.templateId).category === c.id).length])),
@@ -130,6 +133,12 @@ export default function Home() {
         </Card>
       )}
 
+      {data.nudges.length ? (
+        <Section title="Coming up for the family">
+          <NudgeCards nudges={data.nudges} members={family.members} limit={2} />
+        </Section>
+      ) : null}
+
       <Section
         title="Family"
         action={
@@ -189,9 +198,12 @@ export default function Home() {
 
       <Section title="Handy">
         <Card padded={false}>
-          <Row title="Family ID sheet" subtitle="Everyone’s numbers on one page" icon="IdCard" tint="lifafa" onPress={() => router.push('/extras/id-sheet')} />
+          <Row title="Situation packs" subtitle="Hospital, bank KYC, school, exam form: one PDF" icon="Package" tint="inland" onPress={() => router.push('/extras/packs')} testID="handy-packs" />
+          <Row title="Family ID sheet" subtitle="Everyone’s numbers on one page" icon="IdCard" tint="lifafa" divider onPress={() => router.push('/extras/id-sheet')} />
           <Row title="Emergency cards" subtitle="Blood group, allergies, medicines" icon="HeartPulse" tint="sindoor" divider onPress={() => router.push('/extras/emergency')} />
           <Row title="Where is the original?" subtitle="Every paper by where it is kept" icon="MapPin" tint="inland" divider onPress={() => router.push('/extras/places')} />
+          <Row title="Money map" subtitle="Every account and policy, and its nominee" icon="PiggyBank" tint="haldi" divider onPress={() => router.push('/extras/money-map')} testID="handy-money" />
+          <Row title="Print-ready sheet" subtitle="Cards at true size, front and back, on A4" icon="Download" tint="stamp" divider onPress={() => router.push('/extras/print-sheet')} testID="handy-print" />
           <Row title="Kaam ke numbers" subtitle="Doctor, CA, gas agency, electrician" icon="Phone" tint="haldi" divider onPress={() => router.push('/extras/contacts')} />
           <Row title="Recently deleted" subtitle="Kept for 30 days" icon="Trash" tint="almari" divider onPress={() => router.push('/settings/deleted')} />
         </Card>

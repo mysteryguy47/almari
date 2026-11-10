@@ -11,7 +11,7 @@ export const ICON_NAMES = [
   'FingerprintPattern', 'Flame', 'Flower2', 'Folder', 'Fuel', 'Gauge', 'Gavel', 'Gift', 'Glasses', 'Globe',
   'GraduationCap', 'HandCoins', 'Handshake', 'Hash', 'Heart', 'HeartHandshake', 'HeartPulse', 'Hospital', 'House',
   'IdCard', 'Image', 'IndianRupee', 'Info', 'KeyRound', 'Landmark', 'Languages', 'LayoutGrid', 'Leaf',
-  'Lightbulb', 'ListTodo', 'Lock', 'LogOut', 'Mail', 'MapPin', 'Microscope', 'Moon', 'Newspaper', 'NotebookPen',
+  'Lightbulb', 'ListTodo', 'Lock', 'LogOut', 'Mail', 'MapPin', 'Microscope', 'Minus', 'Moon', 'Newspaper', 'NotebookPen',
   'Package', 'Palette', 'PawPrint', 'PenLine', 'Phone', 'PiggyBank', 'Pill', 'Plane', 'PlugZap', 'Plus',
   'Receipt', 'ReceiptText', 'Repeat', 'RotateCcw', 'Router', 'Scale', 'ScanLine', 'School', 'ScrollText',
   'Search', 'Send', 'Settings', 'Share2', 'Shield', 'ShieldCheck', 'Signature', 'Smartphone', 'Sofa', 'Sparkles',

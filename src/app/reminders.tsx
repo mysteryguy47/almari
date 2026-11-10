@@ -7,7 +7,9 @@ import { Card, EmptyState, Row, Screen, Section } from '@/components/Layout';
 import { T } from '@/components/Text';
 import { displayName, findMember } from '@/domain/access';
 import { formatDateTime, relativeDays } from '@/domain/dates';
+import { lifeStageNudges } from '@/domain/nudges';
 import { attentionFor, plannedNotifications } from '@/domain/reminders';
+import { NudgeCards } from '@/components/Nudges';
 import { attentionHref, stampFor } from '@/lib/attention';
 import { useCtx } from '@/store/hooks';
 import { space } from '@/theme/tokens';
@@ -15,7 +17,7 @@ import { space } from '@/theme/tokens';
 /** Everything you will be reminded about, and when the next reminders go out. */
 export default function Reminders() {
   const ctx = useCtx();
-  const data = useMemo(() => (ctx ? { now: attentionFor(ctx.family, ctx.viewerId), planned: plannedNotifications(ctx.family, ctx.viewerId).slice(0, 12) } : null), [ctx]);
+  const data = useMemo(() => (ctx ? { now: attentionFor(ctx.family, ctx.viewerId), nudges: lifeStageNudges(ctx.family), planned: plannedNotifications(ctx.family, ctx.viewerId).slice(0, 12) } : null), [ctx]);
   if (!ctx || !data) return <Redirect href="/" />;
 
   return (
@@ -45,6 +47,11 @@ export default function Reminders() {
           <EmptyState icon="CircleCheck" title="All clear" line="Nothing expiring or due soon." />
         )}
       </Section>
+      {data.nudges.length ? (
+        <Section title="Coming up for the family">
+          <NudgeCards nudges={data.nudges} members={ctx.family.members} limit={10} />
+        </Section>
+      ) : null}
       <Section title="Coming up on this phone">
         <Card padded={false}>
           {data.planned.length ? (
