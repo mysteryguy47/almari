@@ -1,0 +1,62 @@
+{
+  "expo": {
+    "name": "Almari",
+    "slug": "almari",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "almari",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "icon": "./assets/images/icon.png"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#34574A",
+        "foregroundImage": "./assets/images/android-icon-foreground.png",
+        "backgroundImage": "./assets/images/android-icon-background.png",
+        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "package": "com.blackmonkey.almari"
+    },
+    "web": {
+      "output": "single",
+      "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#F4EFE6",
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 76,
+          "dark": {
+            "backgroundColor": "#12110E"
+          }
+        }
+      ],
+      "expo-sharing",
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "Almari uses the camera to photograph your documents.",
+          "photosPermission": "Almari lets you pick photos of documents you already have."
+        }
+      ],
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Almari uses Face ID to unlock your family vault."
+        }
+      ],
+      "expo-font"
+    ],
+    "experiments": {
+      "typedRoutes": false,
+      "reactCompiler": true
+    },
+    "description": "Ghar ke saare kaagaz, ek jagah. A family vault for documents, ID numbers, passwords and bank details."
+  }
+}

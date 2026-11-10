@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en-IN">
+  <head>
+    <meta charset="utf-8" />
+    <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no, viewport-fit=cover" />
+    <title>Almari</title>
+    <meta name="description" content="Ghar ke saare kaagaz, ek jagah. Your family's documents, ID numbers, passwords and bank details, in one place." />
+
+    <!-- Installable web app (the iPhone version): Add to Home Screen from Safari. -->
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#F4EFE6" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Almari" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+
+    <!-- The `react-native-web` recommended style reset: https://necolas.github.io/react-native-web/docs/setup/#root-element -->
+    <style id="expo-reset">
+      html,
+      body {
+        height: 100%;
+        background-color: #f4efe6;
+      }
+      @media (prefers-color-scheme: dark) {
+        html,
+        body {
+          background-color: #12110e;
+        }
+      }
+      body {
+        overflow: hidden;
+      }
+      #root {
+        display: flex;
+        height: 100%;
+        flex: 1;
+      }
+    </style>
+
+    <script>
+      // Offline support for the installed web app. Skipped on the development
+      // server (port 8081) so stale development code is never cached.
+      if ('serviceWorker' in navigator && location.port !== '8081') {
+        window.addEventListener('load', function () {
+          navigator.serviceWorker.register('/sw.js').catch(function (error) {
+            console.warn('Offline support is unavailable', error);
+          });
+        });
+      }
+    </script>
+  </head>
+
+  <body>
+    <noscript>Almari needs JavaScript to run.</noscript>
+    <div id="root"></div>
+  </body>
+</html>
