@@ -6,6 +6,7 @@ import { Button } from '@/components/Button';
 import { ChipChoice, DateField, Segmented, TextField, ToggleRow } from '@/components/Fields';
 import { InviteActions, InviteSheet, inviteMessage } from '@/components/InviteShare';
 import { Card, goBack, Screen, Section } from '@/components/Layout';
+import { countFilled, More, MoreGroup } from '@/components/More';
 import { Sheet } from '@/components/Sheet';
 import { SlideToConfirm } from '@/components/SlideToConfirm';
 import { T } from '@/components/Text';
@@ -138,15 +139,30 @@ export default function MemberScreen() {
       ) : null}
       {!isPet ? (
         <>
-          <Section title="Gender">
-            <ChipChoice options={GENDERS} value={gender} onChange={setGender} />
-          </Section>
-          <DateField label="Date of birth" value={dob} onChange={setDob} allowYearOnly helper={age ? `${age.years}${age.approximate ? ' (approx.)' : ''} years old` : 'Only the year is fine'} testID="member-dob" />
-          <TextField label="Mobile" value={phone} onChangeText={setPhone} keyboardType="phone-pad" check={checkPhone(phone)} />
-          <Section title="Blood group">
-            <ChipChoice options={BLOOD_GROUPS} value={bloodGroup} onChange={setBloodGroup} />
-          </Section>
-          <Section title="ID numbers (fill in themselves when the papers are added)">
+          <More
+            summary="Date of birth, gender, mobile, blood group"
+            filled={countFilled(dob, gender, phone, bloodGroup)}
+            initiallyOpen={!!m && countFilled(m.dob, m.gender, m.phone, m.bloodGroup) > 0}
+            testID="member-more"
+          >
+            <DateField label="Date of birth" value={dob} onChange={setDob} allowYearOnly helper={age ? `${age.years}${age.approximate ? ' (approx.)' : ''} years old` : 'Only the year is fine. Used for age-based reminders.'} testID="member-dob" />
+            <MoreGroup title="Gender">
+              <ChipChoice options={GENDERS} value={gender} onChange={setGender} />
+            </MoreGroup>
+            <TextField label="Mobile" value={phone} onChangeText={setPhone} keyboardType="phone-pad" check={checkPhone(phone)} />
+            <MoreGroup title="Blood group">
+              <View style={styles.blood}>
+                <ChipChoice options={BLOOD_GROUPS} value={bloodGroup} onChange={setBloodGroup} />
+              </View>
+            </MoreGroup>
+          </More>
+          <More
+            title="ID numbers"
+            summary="Aadhaar, PAN, voter ID, licence, passport. They fill in by themselves when the papers are added."
+            filled={countFilled(...ID_KINDS.map((k) => ids[k]))}
+            initiallyOpen={tried && ID_KINDS.some((k) => ID_CHECKS[k](ids[k] ?? '').level === 'error')}
+            testID="member-ids"
+          >
             {ID_KINDS.map((k) => (
               <TextField
                 key={k}
@@ -159,14 +175,19 @@ export default function MemberScreen() {
                 testID={`member-id-${k}`}
               />
             ))}
-          </Section>
-          <Section title="Emergency card">
+          </More>
+          <More
+            title="Emergency card"
+            summary="Allergies, conditions, medicines, doctor, who to call"
+            filled={countFilled(emergency.allergies, emergency.conditions, emergency.medicines, emergency.doctor, emergency.contacts)}
+            testID="member-emergency"
+          >
             <TextField label="Allergies" value={emergency.allergies ?? ''} onChangeText={(v) => setEmergency((e) => ({ ...e, allergies: v }))} />
             <TextField label="Conditions" value={emergency.conditions ?? ''} onChangeText={(v) => setEmergency((e) => ({ ...e, conditions: v }))} />
             <TextField label="Regular medicines" value={emergency.medicines ?? ''} onChangeText={(v) => setEmergency((e) => ({ ...e, medicines: v }))} multiline />
             <TextField label="Doctor" value={emergency.doctor ?? ''} onChangeText={(v) => setEmergency((e) => ({ ...e, doctor: v }))} />
             <TextField label="Emergency contacts" value={emergency.contacts ?? ''} onChangeText={(v) => setEmergency((e) => ({ ...e, contacts: v }))} multiline />
-          </Section>
+          </More>
         </>
       ) : null}
       {error ? <T variant="smallStrong" color="sindoor">{error}</T> : null}
@@ -251,4 +272,5 @@ const styles = StyleSheet.create({
   danger: { gap: space.md, marginTop: space.lg },
   claim: { marginBottom: space.lg },
   sheet: { paddingBottom: space.md },
+  blood: { marginBottom: space.lg },
 });

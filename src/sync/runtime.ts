@@ -10,7 +10,7 @@ import { create } from 'zustand';
 
 import { fromB64, initCrypto, keyPairFromMaster, openSealed, toB64, type KeyPair } from '@/lib/crypto';
 import { useApp } from '@/store/app-store';
-import { cipherStore, setFileRemote } from '@/store/files';
+import { cipherStore, setFileKeepPolicy, setFileRemote } from '@/store/files';
 import { kv } from '@/store/kv';
 import { flushSaves } from '@/store/persist-storage';
 import { toast } from '@/store/ui-store';
@@ -220,8 +220,10 @@ async function round(): Promise<void> {
   if (!cloud) return;
   for (const familyId of Object.keys(cloud.memberships)) {
     if (!appReplica.currentFamilyKey(familyId)) continue;
-    await syncFamily(api(), appReplica, familyId, { files: cipherStore, notices, prefetch: true });
+    const cloudOnly = !!useApp.getState().device.cloudOnly?.[familyId];
+    await syncFamily(api(), appReplica, familyId, { files: cipherStore, notices, prefetch: !cloudOnly });
     claimMyMember(familyId);
+    if (cloudOnly) await sweepLocalCopies(familyId);
   }
   // A claim queues one more change: send it now.
   for (const familyId of Object.keys(useApp.getState().cloud?.memberships ?? {})) {
@@ -231,6 +233,15 @@ async function round(): Promise<void> {
   }
   await flushSaves();
   watchRealtime();
+}
+
+/** A "cloud only" family: once uploaded, file copies leave this device. */
+export async function sweepLocalCopies(familyId: string): Promise<void> {
+  const s = useApp.getState();
+  const pending = new Set(s.cloud?.sync[familyId]?.pendingUploads ?? []);
+  for (const doc of s.families[familyId]?.documents ?? []) {
+    for (const f of doc.files) if (f.key && !pending.has(f.id)) await cipherStore.forget(f.id).catch(() => undefined);
+  }
 }
 
 /** Runs a sync now (or right after the one in progress). Resolves when it is done. */
@@ -331,6 +342,7 @@ export function startCloud(): void {
   if (started || !cloudConfigured()) return;
   started = true;
   setFileRemote((familyId, fileId) => api().downloadFile(familyId, fileId));
+  setFileKeepPolicy((familyId) => !useApp.getState().device.cloudOnly?.[familyId]);
 
   // Every local edit of a synced family is queued for the server.
   useApp.subscribe((state, prev) => {

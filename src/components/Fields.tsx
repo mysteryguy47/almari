@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import { Pressable, StyleSheet, Switch, TextInput, View, type KeyboardTypeOptions, type TextInputProps } from 'react-native';
+import { Platform, Pressable, StyleSheet, Switch, TextInput, View, type KeyboardTypeOptions, type TextInputProps, type ViewStyle } from 'react-native';
 
 import { daysInMonth, parseDob, parseISODate, toISODate } from '@/domain/dates';
 import { charLength, type Check } from '@/domain/validation';
@@ -9,6 +9,14 @@ import { fonts, radius, space } from '@/theme/tokens';
 import { Chip } from './Bits';
 import { Icon } from './Icon';
 import { T } from './Text';
+
+/** No browser focus outline on the bare input: the rounded field draws the ring itself. */
+const NO_OUTLINE = (Platform.OS === 'web' ? { outlineStyle: 'none', outlineWidth: 0 } : {}) as object;
+
+/** The soft ring around a focused field, following its rounded corners. */
+export function focusRing(color: string): ViewStyle {
+  return { boxShadow: `0 0 0 3px ${color}` } as ViewStyle;
+}
 
 export interface TextFieldProps {
   label: string;
@@ -54,7 +62,7 @@ export function TextField({
           </T>
         ) : null}
       </View>
-      <View style={[styles.inputWrap, { borderColor, backgroundColor: palette.surface }]}>
+      <View style={[styles.inputWrap, { borderColor, backgroundColor: palette.surface }, focused ? focusRing(visibleCheck?.level === 'error' ? palette.sindoorSoft : palette.accentSoft) : null]}>
         <TextInput
           testID={testID}
           accessibilityLabel={label}
@@ -72,7 +80,7 @@ export function TextField({
           onBlur={() => setFocused(false)}
           onSubmitEditing={onSubmitEditing}
           maxFontSizeMultiplier={2}
-          style={[styles.input, multiline ? styles.multiline : null, { color: palette.ink, fontFamily: fonts.regular }]}
+          style={[styles.input, multiline ? styles.multiline : null, { color: palette.ink, fontFamily: fonts.regular }, NO_OUTLINE]}
         />
         {secure ? (
           <Pressable
@@ -111,6 +119,7 @@ export function DateField({
   testID?: string;
 }) {
   const { palette } = useTheme();
+  const [focus, setFocus] = useState<string>();
   const initial = parseISODate(value);
   const yearOnly = !initial ? parseDob(value)?.year : undefined;
   const [d, setD] = useState(initial ? String(initial.d) : '');
@@ -142,7 +151,14 @@ export function DateField({
       placeholderTextColor={palette.ink3}
       keyboardType="number-pad"
       maxFontSizeMultiplier={2}
-      style={[styles.dateBox, { width, borderColor: palette.line, backgroundColor: palette.surface, color: palette.ink, fontFamily: fonts.medium }]}
+      onFocus={() => setFocus(placeholder)}
+      onBlur={() => setFocus((f) => (f === placeholder ? undefined : f))}
+      style={[
+        styles.dateBox,
+        { width, borderColor: focus === placeholder ? palette.accent : palette.line, backgroundColor: palette.surface, color: palette.ink, fontFamily: fonts.medium },
+        focus === placeholder ? focusRing(palette.accentSoft) : null,
+        NO_OUTLINE,
+      ]}
     />
   );
   return (
@@ -242,6 +258,6 @@ const styles = StyleSheet.create({
   dateBox: { height: 52, borderWidth: 1.2, borderRadius: radius.md, textAlign: 'center', fontSize: 18 },
   segmented: { flexDirection: 'row', borderRadius: radius.pill, padding: 4, gap: 4 },
   segment: { flex: 1, minHeight: 44, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center', paddingHorizontal: space.sm, borderWidth: StyleSheet.hairlineWidth, borderColor: 'transparent' },
-  toggleRow: { flexDirection: 'row', alignItems: 'center', gap: space.md, paddingVertical: space.md, minHeight: 56 },
+  toggleRow: { flexDirection: 'row', alignItems: 'center', gap: space.md, paddingVertical: space.xs, minHeight: 52 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },
 });

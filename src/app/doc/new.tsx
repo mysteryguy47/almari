@@ -9,6 +9,7 @@ import { DocThumb } from '@/components/DocThumb';
 import { DateField, TextField, ToggleRow } from '@/components/Fields';
 import { Icon } from '@/components/Icon';
 import { Card, Row, Screen, Section } from '@/components/Layout';
+import { countFilled, More, MoreGroup } from '@/components/More';
 import { FAMILY, MemberPicker } from '@/components/MemberPicker';
 import { T } from '@/components/Text';
 import { displayName, findMember, visibleTo } from '@/domain/access';
@@ -36,7 +37,8 @@ import { toast } from '@/store/ui-store';
 import { useTheme } from '@/theme/ThemeProvider';
 import { radius, space } from '@/theme/tokens';
 
-const MAX_FILES = 4;
+/** Pages or sides per document (a property deed can run long). Each file up to 10 MB. */
+const MAX_FILES = 10;
 
 type Slot = { kind: 'saved'; ref: FileRef } | { kind: 'new'; id: string; picked: PickedFile };
 
@@ -173,6 +175,7 @@ export default function AddDocument() {
   const [tried, setTried] = useState(false);
   const [saving, setSaving] = useState(false);
   const [fileError, setFileError] = useState<string>();
+  const [moreOpen, setMoreOpen] = useState(!!existing && countFilled(existing.number, existing.issueDate, existing.expiryDate, existing.nominee, existing.original) > 0);
 
   if (!ctx) return <Redirect href="/" />;
   const { family, viewerId } = ctx;
@@ -226,16 +229,23 @@ export default function AddDocument() {
     }
   };
 
-  const addFile = async (pick: () => Promise<PickResult>) => {
+  const addFile = async (pick: (limit: number) => Promise<PickResult>) => {
     setFileError(undefined);
-    if (slots.length >= MAX_FILES) return setFileError(`Up to ${MAX_FILES} pages or sides for now`);
+    const room = MAX_FILES - slots.length;
+    if (room <= 0) return setFileError(`Up to ${MAX_FILES} pages or sides per document`);
     try {
-      const result = await pick();
+      const result = await pick(room);
       if (!result) return;
       if ('denied' in result) return setFileError('Camera permission is off. Turn it on in phone settings, or pick a photo instead.');
-      const check = checkFile({ name: result.file.name, size: result.file.size, mime: result.file.mime });
-      if (check.level === 'error') return setFileError(check.message);
-      setSlots((s) => [...s, { kind: 'new', id: newId(), picked: result.file }]);
+      const good: Slot[] = [];
+      let problem: string | undefined;
+      for (const file of result.files.slice(0, room)) {
+        const check = checkFile({ name: file.name, size: file.size, mime: file.mime });
+        if (check.level === 'error') problem = problem ?? `${file.name}: ${check.message}`;
+        else good.push({ kind: 'new', id: newId(), picked: file });
+      }
+      if (good.length) setSlots((s) => [...s, ...good].slice(0, MAX_FILES));
+      if (problem) setFileError(result.files.length > 1 ? `${problem}. The others were added.` : problem.replace(/^[^:]+: /, ''));
     } catch {
       setFileError('Could not open that file. Try another, or a photo of it.');
     }
@@ -287,6 +297,13 @@ export default function AddDocument() {
     }
   };
 
+  const moreSummary = [
+    template.number?.label,
+    template.issueDate ? 'issue date' : undefined,
+    template.expiry ? `${template.expiry.label.toLowerCase()} (for reminders)` : undefined,
+    template.nominee ? 'nominee' : undefined,
+    'where the original is kept',
+  ].filter(Boolean).join(', ').replace(/^./, (c) => c.toUpperCase());
   const sideLabel = (i: number) => (template.sides === 2 ? (i === 0 ? 'Front' : i === 1 ? 'Back' : `Page ${i + 1}`) : slots.length > 1 ? `Page ${i + 1}` : 'File');
   const category = getCategory(template.category);
 
@@ -304,7 +321,7 @@ export default function AddDocument() {
         </Pressable>
       ) : null}
 
-      <Section title="For whom">
+      <Section title="For whom" required>
         {common ? (
           <Card style={styles.commonNote}>
             <Icon name="Users" size={20} color="inland" />
@@ -315,7 +332,7 @@ export default function AddDocument() {
         )}
       </Section>
 
-      <Section title={template.sides === 2 ? 'Photo of the front, then the back' : 'Photo or file'}>
+      <Section title={template.sides === 2 ? 'Photo of the front, then the back' : 'Photo or file'} required>
         {slots.map((slot, i) => (
           <FileTile key={slot.kind === 'saved' ? slot.ref.id : slot.id} slot={slot} label={sideLabel(i)} onRemove={() => setSlots((s) => s.filter((_, j) => j !== i))} />
         ))}
@@ -327,45 +344,11 @@ export default function AddDocument() {
           </View>
         ) : null}
         {fileError ? <T variant="small" color="sindoor">{fileError}</T> : tried && checks.files.level === 'error' ? <T variant="small" color="sindoor">{checks.files.message}</T> : (
-          <T variant="small" color="ink3">Photos, PDF, Word, Excel. Up to 10 MB each. Shared from WhatsApp or DigiLocker works too.</T>
+          <T variant="small" color="ink3">
+            Up to {MAX_FILES} pages, several at once from Photos or Files. Photos, PDF, Word, Excel, up to 10 MB each. Shared from WhatsApp or DigiLocker works too.
+          </T>
         )}
       </Section>
-
-      {(template.number || template.expiry) && firstImage ? (
-        <Card style={styles.ocr}>
-          {OCR_AVAILABLE ? (
-            <>
-              <Button
-                label={ocr.state === 'reading' ? 'Reading the photo…' : 'Read the number from the photo'}
-                icon="ScanLine"
-                variant="secondary"
-                size="md"
-                loading={ocr.state === 'reading'}
-                onPress={readPhoto}
-                testID="ocr-read"
-              />
-              {ocr.state === 'done' && ocr.suggestion ? (
-                <View style={styles.ocrFound}>
-                  {ocr.suggestion.number ? (
-                    <Chip testID="ocr-use-number" icon="Check" label={`Use ${ocr.suggestion.number}`} onPress={() => setNumber(ocr.suggestion?.number ?? '')} />
-                  ) : null}
-                  {ocr.suggestion.expiryDate && template.expiry ? (
-                    <Chip testID="ocr-use-expiry" icon="Check" label={`${template.expiry.label} ${formatDate(ocr.suggestion.expiryDate)}`} onPress={() => { setExpiryDate(ocr.suggestion?.expiryDate); setDateKey((k) => k + 1); }} />
-                  ) : null}
-                  {ocr.suggestion.issueDate && template.issueDate ? (
-                    <Chip icon="Check" label={`Issued ${formatDate(ocr.suggestion.issueDate)}`} onPress={() => { setIssueDate(ocr.suggestion?.issueDate); setDateKey((k) => k + 1); }} />
-                  ) : null}
-                  {!ocr.suggestion.number && !ocr.suggestion.expiryDate ? <T variant="small" color="ink2">No number found. A sharper, straight photo helps, or type it in.</T> : null}
-                </View>
-              ) : null}
-              {ocr.state === 'failed' ? <T variant="small" color="sindoor">Could not read the photo. Type the number in.</T> : null}
-              <T variant="small" color="ink3">Read on this device. Check what it finds before saving.</T>
-            </>
-          ) : (
-            <T variant="small" color="ink3">{OCR_UNAVAILABLE_REASON}</T>
-          )}
-        </Card>
-      ) : null}
 
       <TextField
         label="Title"
@@ -380,42 +363,6 @@ export default function AddDocument() {
         showCheck={tried}
         testID="doc-title"
       />
-      {template.number ? (
-        <TextField
-          label={template.number.label}
-          value={number}
-          onChangeText={setNumber}
-          keyboardType={template.number.kind === 'aadhaar' ? 'number-pad' : undefined}
-          autoCapitalize={template.number.kind && template.number.kind !== 'aadhaar' ? 'characters' : 'none'}
-          check={duplicate ? { level: 'warn', message: `Already saved as ${duplicate.title}` } : checks.number}
-          helper={template.profileId ? `Also fills ${owner && owner.id !== viewerId ? `${displayName(owner)}’s` : 'your'} profile` : undefined}
-          testID="doc-number"
-        />
-      ) : null}
-      {template.issueDate ? <DateField key={`issue-${dateKey}`} label="Issued on" value={issueDate} onChange={setIssueDate} testID="doc-issue" /> : null}
-      {template.expiry ? (
-        <DateField
-          key={`expiry-${dateKey}`}
-          label={template.expiry.label}
-          value={expiryDate}
-          onChange={setExpiryDate}
-          helper={template.expiry.rule?.months ? 'Reminders 9 and 3 months before, for visa rules' : 'Reminders 30, 7 and 1 day before'}
-          testID="doc-expiry"
-        />
-      ) : null}
-
-      {template.nominee ? (
-        <TextField label="Nominee" value={nominee} onChangeText={setNominee} placeholder="Who receives it, as written on the form" helper="The money map flags accounts and policies without one" testID="doc-nominee" />
-      ) : null}
-
-      <Section title="Where is the original kept?">
-        <View style={styles.chips}>
-          {ORIGINAL_PLACES.map((p) => (
-            <Chip key={p} label={p} selected={original === p} onPress={() => setOriginal(original === p ? '' : p)} />
-          ))}
-        </View>
-        <TextField label="Or describe it" value={original} onChangeText={setOriginal} placeholder="Steel almari, top shelf, red file" max={80} testID="doc-original" />
-      </Section>
 
       <TextField label="Description" value={description} onChangeText={setDescription} max={LIMITS.docDescription} multiline check={checks.description} showCheck={tried} placeholder="Optional" testID="doc-description" />
 
@@ -424,6 +371,85 @@ export default function AddDocument() {
           <ToggleRow title="Only me" subtitle="Nobody else in the family sees this, whatever the family setting." value={onlyMe} onValueChange={setOnlyMe} testID="doc-only-me" />
         </Card>
       ) : null}
+
+      {(template.number || template.expiry) && firstImage ? (
+        <Card style={styles.ocr}>
+          {OCR_AVAILABLE ? (
+            <>
+              <Button
+                label={ocr.state === 'reading' ? 'Reading the photo…' : template.number ? 'Read the number from the photo' : 'Read the dates from the photo'}
+                icon="ScanLine"
+                variant="secondary"
+                size="md"
+                loading={ocr.state === 'reading'}
+                onPress={readPhoto}
+                testID="ocr-read"
+              />
+              {ocr.state === 'done' && ocr.suggestion ? (
+                <View style={styles.ocrFound}>
+                  {ocr.suggestion.number ? (
+                    <Chip testID="ocr-use-number" icon="Check" label={`Use ${ocr.suggestion.number}`} onPress={() => { setNumber(ocr.suggestion?.number ?? ''); setMoreOpen(true); }} />
+                  ) : null}
+                  {ocr.suggestion.expiryDate && template.expiry ? (
+                    <Chip testID="ocr-use-expiry" icon="Check" label={`${template.expiry.label} ${formatDate(ocr.suggestion.expiryDate)}`} onPress={() => { setExpiryDate(ocr.suggestion?.expiryDate); setDateKey((k) => k + 1); setMoreOpen(true); }} />
+                  ) : null}
+                  {ocr.suggestion.issueDate && template.issueDate ? (
+                    <Chip icon="Check" label={`Issued ${formatDate(ocr.suggestion.issueDate)}`} onPress={() => { setIssueDate(ocr.suggestion?.issueDate); setDateKey((k) => k + 1); setMoreOpen(true); }} />
+                  ) : null}
+                  {!ocr.suggestion.number && !ocr.suggestion.expiryDate ? <T variant="small" color="ink2">No number found. A sharper, straight photo helps, or type it in.</T> : null}
+                </View>
+              ) : null}
+              {ocr.state === 'failed' ? <T variant="small" color="sindoor">Could not read the photo. Type the number in.</T> : null}
+              <T variant="small" color="ink3">Read on this device. Check what it finds before saving.</T>
+            </>
+          ) : (
+            <T variant="small" color="ink3">{OCR_UNAVAILABLE_REASON}</T>
+          )}
+        </Card>
+      ) : null}
+
+      <More
+        summary={moreSummary}
+        filled={countFilled(number, issueDate, expiryDate, nominee, original)}
+        open={moreOpen}
+        onToggle={setMoreOpen}
+        testID="doc-more"
+      >
+        {template.number ? (
+          <TextField
+            label={template.number.label}
+            value={number}
+            onChangeText={setNumber}
+            keyboardType={template.number.kind === 'aadhaar' ? 'number-pad' : undefined}
+            autoCapitalize={template.number.kind && template.number.kind !== 'aadhaar' ? 'characters' : 'none'}
+            check={duplicate ? { level: 'warn', message: `Already saved as ${duplicate.title}` } : checks.number}
+            helper={template.profileId ? `Also fills ${owner && owner.id !== viewerId ? `${displayName(owner)}’s` : 'your'} profile` : undefined}
+            testID="doc-number"
+          />
+        ) : null}
+        {template.issueDate ? <DateField key={`issue-${dateKey}`} label="Issued on" value={issueDate} onChange={setIssueDate} testID="doc-issue" /> : null}
+        {template.expiry ? (
+          <DateField
+            key={`expiry-${dateKey}`}
+            label={template.expiry.label}
+            value={expiryDate}
+            onChange={setExpiryDate}
+            helper={template.expiry.rule?.months ? 'Reminders 9 and 3 months before, for visa rules' : 'Reminders 30, 7 and 1 day before'}
+            testID="doc-expiry"
+          />
+        ) : null}
+        {template.nominee ? (
+          <TextField label="Nominee" value={nominee} onChangeText={setNominee} placeholder="Who receives it, as written on the form" helper="The money map flags accounts and policies without one" testID="doc-nominee" />
+        ) : null}
+        <MoreGroup title="Where is the original kept?">
+          <View style={styles.chips}>
+            {ORIGINAL_PLACES.map((p) => (
+              <Chip key={p} label={p} selected={original === p} onPress={() => setOriginal(original === p ? '' : p)} />
+            ))}
+          </View>
+          <TextField label="Or describe it" value={original} onChangeText={setOriginal} placeholder="Steel almari, top shelf, red file" max={80} testID="doc-original" />
+        </MoreGroup>
+      </More>
       {renew ? <T variant="small" color="ink2">The renewed copy replaces the old one on this card. (Keeping the old one in history comes with the full app.)</T> : null}
     </Screen>
   );

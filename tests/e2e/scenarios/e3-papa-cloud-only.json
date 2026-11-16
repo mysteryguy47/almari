@@ -1,0 +1,28 @@
+{
+  "profile": "e-papa", "noWebShare": true,
+  "steps": [
+    ["go", "/settings/storage", 6000],
+    ["tap", "lock-pin-1"], ["tap", "lock-pin-3"], ["tap", "lock-pin-5"], ["tap", "lock-pin-7"],
+    ["wait", 6000],
+    ["waitFor", "Where papers are kept", 10000],
+    ["expect", "use its cloud copy on their phones"],
+    ["shot", "e3-01-storage", "full"],
+    ["tap", "storage-cloud"],
+    ["waitFor", "Cloud only?", 5000],
+    ["slide", "slide-storage"],
+    ["waitFor", "Copies have left this phone", 30000],
+    ["eval", "(async () => { const db = await new Promise((r, j) => { const q = indexedDB.open('almari'); q.onsuccess = () => r(q.result); q.onerror = j; }); const n = await new Promise((r) => { const t = db.transaction('files').objectStore('files').count(); t.onsuccess = () => r(t.result); }); return n === 0 ? 'no file copies on the device' : 'EXPECTED no files, found ' + n; })()"],
+    ["reload", 6000],
+    ["tap", "lock-pin-1"], ["tap", "lock-pin-3"], ["tap", "lock-pin-5"], ["tap", "lock-pin-7"],
+    ["waitFor", "Namaste, Ayush", 20000],
+    ["go", "/search", 4000],
+    ["tap", "lock-pin-1"], ["tap", "lock-pin-3"], ["tap", "lock-pin-5"], ["tap", "lock-pin-7"],
+    ["wait", 4000],
+    ["type", "search-input", "pan"],
+    ["waitFor", "PAN", 10000],
+    ["eval", "(() => { const el = [...document.querySelectorAll('[role=\"button\"]')].find(e => /PAN card/.test(e.getAttribute('aria-label') || e.textContent)); if (!el) return 'MISSING PAN row'; el.click(); return 'ok'; })()"],
+    ["wait", 5000],
+    ["eval", "(() => { const imgs = [...document.querySelectorAll('img')].filter(i => i.src.startsWith('blob:') && i.naturalWidth > 0); return imgs.length ? 'photo loaded from the cloud' : 'EXPECTED the photo'; })()"],
+    ["eval", "(async () => { const db = await new Promise((r, j) => { const q = indexedDB.open('almari'); q.onsuccess = () => r(q.result); q.onerror = j; }); const n = await new Promise((r) => { const t = db.transaction('files').objectStore('files').count(); t.onsuccess = () => r(t.result); }); return n === 0 ? 'still nothing kept on the device' : 'EXPECTED no files, found ' + n; })()"]
+  ]
+}

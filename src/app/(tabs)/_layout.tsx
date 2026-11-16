@@ -82,8 +82,9 @@ export default function TabsLayout() {
   const lockedOut = useApp((s) => !!s.device.lockedOut);
   const deviceReady = useDeviceReady();
 
+  const noAccount = useApp((s) => !!s.device.noAccount);
   if (!ctx) {
-    if (!cloud) return <Redirect href="/welcome" />;
+    if (!cloud) return <Redirect href={noAccount ? '/start/you' : '/welcome'} />;
     if (lockedOut) return <Redirect href="/auth/sign-in" />;
     if (!deviceReady) return <Redirect href="/setup/device" />;
     // Just joined: the family's papers are on their way down.

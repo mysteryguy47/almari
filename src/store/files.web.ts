@@ -20,6 +20,12 @@ export interface PickedFile {
 
 type Remote = (familyId: string, fileId: string) => Promise<Uint8Array | null>;
 let remote: Remote | null = null;
+let keep: (familyId: string) => boolean = () => true;
+
+/** Whether a file fetched from the server stays on this device ("cloud only" families do not keep copies). */
+export function setFileKeepPolicy(policy: (familyId: string) => boolean): void {
+  keep = policy;
+}
 
 /** The sync layer tells this module how to fetch a file this device does not have yet. */
 export function setFileRemote(fetcher: Remote | null): void {
@@ -69,7 +75,7 @@ export async function fileBytes(ref: FileRef): Promise<Uint8Array | null> {
   let stored = await asBytes(await idbGet('files', ref.id));
   if (!stored && locked(ref) && remote) {
     stored = await remote(ref.familyId, ref.id);
-    if (stored) await idbSet('files', ref.id, stored);
+    if (stored && keep(ref.familyId)) await idbSet('files', ref.id, stored);
   }
   if (!stored) return null;
   if (!locked(ref)) return stored;

@@ -1,0 +1,41 @@
+{
+ "profile": "d-look",
+ "steps": [
+  [
+   "go",
+   "/task/new",
+   6000
+  ],
+  [
+   "eval",
+   "(() => { const sw = document.querySelector('[data-testid=\"task-has-due\"] [role=\"switch\"], [data-testid=\"task-has-due\"] input, input[data-testid=\"task-has-due\"]'); if (!sw) return 'MISSING switch'; sw.click(); return 'ok'; })()"
+  ],
+  [
+   "wait",
+   2000
+  ],
+  [
+   "eval",
+   "(() => { const centre = (id) => { const col = document.querySelector('[data-testid=\"' + id + '\"]'); if (!col) return '?'; const r = col.getBoundingClientRect(); const el = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return el ? el.innerText.trim() : '?'; }; return ['task-date-day','task-date-month','task-date-year','task-time-hour','task-time-minute','task-time-ampm'].map(centre).join(' '); })()"
+  ],
+  [
+   "scroll",
+   "task-date-month",
+   44
+  ],
+  [
+   "wait",
+   1500
+  ],
+  [
+   "save",
+   "due",
+   "[...document.querySelectorAll('div')].map(d => d.innerText).find(t => /^Due date\\nDue /.test(t))?.split('\\n')[1]"
+  ],
+  [
+   "shot",
+   "d3-01-wheels",
+   "full"
+  ]
+ ]
+}

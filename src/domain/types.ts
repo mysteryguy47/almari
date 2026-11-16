@@ -269,6 +269,12 @@ export interface Family {
   removalRequests: RemovalRequest[];
   /** Life-stage suggestions someone dismissed ("memberId:rule:year"). */
   dismissedNudges?: string[];
+  /** The year on the nameplate ("Est. 1952"), when the family set it. Otherwise the eldest member's birth year. */
+  establishedYear?: number;
   /** True for the built-in sample family. */
   isSample?: boolean;
+  /** "local": kept on this phone only, never on Almari's server. Absent: kept in the cloud (and usually on the phone too). */
+  storage?: 'local';
+  /** For a phone-only family: which member the person on this phone is. */
+  localViewerId?: ID;
 }

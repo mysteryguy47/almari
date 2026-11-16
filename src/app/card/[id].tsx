@@ -3,11 +3,13 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { BankCard } from '@/components/BankCard';
-import { Chip, Stamp } from '@/components/Bits';
+import { Stamp } from '@/components/Bits';
 import { Button } from '@/components/Button';
 import { ChipChoice, Segmented, TextField, ToggleRow } from '@/components/Fields';
 import { DeleteItem, NotFound, OnlyMeToggle, OwnerPicker, ownerName } from '@/components/ItemBits';
-import { Card, Screen, Section } from '@/components/Layout';
+import { ChipScroller } from '@/components/ChipScroller';
+import { countFilled, More, MoreGroup } from '@/components/More';
+import { Card, Screen } from '@/components/Layout';
 import { ValueRow } from '@/components/Secret';
 import { T } from '@/components/Text';
 import { canSee, visibleTo } from '@/domain/access';
@@ -48,6 +50,7 @@ export default function CardScreen() {
   const [showSecrets, setShowSecrets] = useState(!!(c?.cvv || c?.pin));
   const [cvv, setCvv] = useState(c?.cvv ?? '');
   const [pin, setPin] = useState(c?.pin ?? '');
+  const [moreOpen, setMoreOpen] = useState(!!c && countFilled(c.nickname, c.nameOnCard, c.creditLimit, c.statementDay, c.dueDay, c.linkedAccountId) > 0);
   const [onlyMe, setOnlyMe] = useState(c?.onlyMe ?? false);
   const [tried, setTried] = useState(false);
 
@@ -145,44 +148,53 @@ export default function CardScreen() {
       </T>
       <OwnerPicker family={family} value={ownerId} onChange={setOwnerId} />
       <TextField label="Bank or issuer" value={bank} onChangeText={setBank} required check={checks.bank} showCheck={tried} testID="card-bank" />
-      {!bank ? <View style={styles.chips}>{COMMON_BANKS.slice(0, 8).map((b) => <Chip key={b} label={b} onPress={() => setBank(b)} />)}</View> : null}
-      <TextField label="Card name (optional)" value={nickname} onChangeText={setNickname} placeholder="Shopping card, Travel card" testID="card-nickname" />
-      <TextField label="Card number" value={number} onChangeText={onNumber} keyboardType="number-pad" required check={checks.number} showCheck={tried || digitsOnly(number).length >= 12} testID="card-number-input" />
-      <Section title="Network">
-        <ChipChoice options={NETWORKS} value={network} onChange={(n) => { setNetwork(n); setNetworkTouched(true); }} />
-      </Section>
-      <View style={styles.row}>
-        <View style={styles.flex}><TextField label="Valid till (MM/YY)" value={expiry} onChangeText={onExpiry} keyboardType="number-pad" check={checks.expiry} testID="card-expiry" /></View>
-        <View style={styles.flex}><TextField label="Name on card" value={nameOnCard} onChangeText={setNameOnCard} autoCapitalize="characters" /></View>
-      </View>
-      {type === 'credit' ? (
-        <Section title="Bill">
-          <TextField label="Credit limit (₹)" value={creditLimit} onChangeText={(v) => setCreditLimit(digitsOnly(v))} keyboardType="number-pad" helper={creditLimit ? formatRupees(Number(creditLimit)) : undefined} testID="card-limit" />
-          <View style={styles.row}>
-            <View style={styles.flex}><TextField label="Statement day" value={statementDay} onChangeText={(v) => setStatementDay(digitsOnly(v).slice(0, 2))} keyboardType="number-pad" check={checks.statement} helper="e.g. 18" testID="card-statement" /></View>
-            <View style={styles.flex}><TextField label="Payment due day" value={dueDay} onChangeText={(v) => setDueDay(digitsOnly(v).slice(0, 2))} keyboardType="number-pad" check={checks.due} helper="e.g. 7" testID="card-due" /></View>
-          </View>
-        </Section>
-      ) : null}
-      {type === 'debit' && ownerAccounts.length ? (
-        <Section title="Linked account">
-          <ChipChoice
-            options={[{ value: '', label: 'None' }, ...ownerAccounts.map((a) => ({ value: a.id, label: `${a.bank} ${maskTail(a.accountNumber)}` }))]}
-            value={linkedAccountId ?? ''}
-            onChange={(v) => setLinkedAccountId(v || undefined)}
-          />
-        </Section>
-      ) : null}
-      <Card style={styles.block}>
-        <ToggleRow title="Also keep CVV and PIN" subtitle={GUARD} value={showSecrets} onValueChange={setShowSecrets} />
-        {showSecrets ? (
-          <View style={styles.row}>
-            <View style={styles.flex}><TextField label="CVV" value={cvv} onChangeText={(v) => setCvv(digitsOnly(v).slice(0, 4))} keyboardType="number-pad" secure /></View>
-            <View style={styles.flex}><TextField label="PIN" value={pin} onChangeText={(v) => setPin(digitsOnly(v).slice(0, 6))} keyboardType="number-pad" secure /></View>
-          </View>
-        ) : null}
-      </Card>
+      {!bank ? <ChipScroller options={COMMON_BANKS.slice(0, 10)} onPick={setBank} testID="bank-suggestions" /> : null}
+      <TextField label="Card number" value={number} onChangeText={onNumber} keyboardType="number-pad" required check={checks.number} showCheck={tried || digitsOnly(number).length >= 12} helper={network !== 'other' ? NETWORK_LABELS[network] : undefined} testID="card-number-input" />
+      <TextField label="Valid till (MM/YY)" value={expiry} onChangeText={onExpiry} keyboardType="number-pad" check={checks.expiry} testID="card-expiry" />
       <OnlyMeToggle visible={ownerId === viewerId} value={onlyMe} onChange={setOnlyMe} />
+      <More
+        summary={type === 'credit' ? 'Card name, name on card, network, bill dates and limit, CVV and PIN' : type === 'debit' ? 'Card name, name on card, network, linked account, CVV and PIN' : 'Card name, name on card, network, CVV and PIN'}
+        filled={countFilled(nickname, nameOnCard, type === 'credit' ? creditLimit : '', type === 'credit' ? statementDay : '', type === 'credit' ? dueDay : '', type === 'debit' ? linkedAccountId : '', showSecrets ? cvv || pin : '')}
+        open={moreOpen || (tried && [checks.statement, checks.due].some((x) => x.level === 'error'))}
+        onToggle={setMoreOpen}
+        testID="card-more"
+      >
+        <MoreGroup title="On the card">
+          <TextField label="Card name (optional)" value={nickname} onChangeText={setNickname} placeholder="Shopping card, Travel card" testID="card-nickname" />
+          <TextField label="Name on card" value={nameOnCard} onChangeText={setNameOnCard} autoCapitalize="characters" />
+          <T variant="smallStrong" color="ink2">Network</T>
+          <View style={styles.networks}>
+            <ChipChoice options={NETWORKS} value={network} onChange={(n) => { setNetwork(n); setNetworkTouched(true); }} />
+          </View>
+        </MoreGroup>
+        {type === 'credit' ? (
+          <MoreGroup title="Bill and limit">
+            <TextField label="Credit limit (₹)" value={creditLimit} onChangeText={(v) => setCreditLimit(digitsOnly(v))} keyboardType="number-pad" helper={creditLimit ? formatRupees(Number(creditLimit)) : undefined} testID="card-limit" />
+            <View style={styles.row}>
+              <View style={styles.flex}><TextField label="Statement day" value={statementDay} onChangeText={(v) => setStatementDay(digitsOnly(v).slice(0, 2))} keyboardType="number-pad" check={checks.statement} helper="e.g. 18" testID="card-statement" /></View>
+              <View style={styles.flex}><TextField label="Payment due day" value={dueDay} onChangeText={(v) => setDueDay(digitsOnly(v).slice(0, 2))} keyboardType="number-pad" check={checks.due} helper="e.g. 7" testID="card-due" /></View>
+            </View>
+          </MoreGroup>
+        ) : null}
+        {type === 'debit' && ownerAccounts.length ? (
+          <MoreGroup title="Linked account">
+            <ChipChoice
+              options={[{ value: '', label: 'None' }, ...ownerAccounts.map((a) => ({ value: a.id, label: `${a.bank} ${maskTail(a.accountNumber)}` }))]}
+              value={linkedAccountId ?? ''}
+              onChange={(v) => setLinkedAccountId(v || undefined)}
+            />
+          </MoreGroup>
+        ) : null}
+        <MoreGroup title="CVV and PIN">
+          <ToggleRow title="Also keep CVV and PIN" subtitle={GUARD} value={showSecrets} onValueChange={setShowSecrets} />
+          {showSecrets ? (
+            <View style={styles.row}>
+              <View style={styles.flex}><TextField label="CVV" value={cvv} onChangeText={(v) => setCvv(digitsOnly(v).slice(0, 4))} keyboardType="number-pad" secure /></View>
+              <View style={styles.flex}><TextField label="PIN" value={pin} onChangeText={(v) => setPin(digitsOnly(v).slice(0, 6))} keyboardType="number-pad" secure /></View>
+            </View>
+          ) : null}
+        </MoreGroup>
+      </More>
     </Screen>
   );
 }
@@ -194,4 +206,5 @@ const styles = StyleSheet.create({
   stamp: { marginBottom: space.md },
   block: { marginBottom: space.lg, gap: space.sm },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm, marginTop: -space.sm, marginBottom: space.lg },
+  networks: { marginBottom: space.lg },
 });

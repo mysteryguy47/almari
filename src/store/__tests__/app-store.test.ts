@@ -56,6 +56,8 @@ function signedInFamily(name = "Khurana's", familyId = 'fam-1') {
   store().addFamily(f, true);
 }
 
+const you = (fullName: string) => ({ fullName, dob: '1990-01-01', gender: 'female' as const });
+
 beforeEach(() => {
   mockMemory.clear();
   useApp.setState({
@@ -108,6 +110,44 @@ describe('families on this device', () => {
     expect(family().notes).toHaveLength(0);
     expect(family().documents.map((d) => d.title)).toEqual(['Flat']);
     expect(family().members.some((m) => m.id === me)).toBe(false);
+  });
+});
+
+describe('on this phone only, and cloud only', () => {
+  it('makes a phone-only family without an account, with the viewer set', () => {
+    store().useWithoutAccount();
+    const r = store().createLocalFamily("Arora's", you('Neha Arora'));
+    expect(r.ok).toBe(true);
+    expect(family()).toMatchObject({ name: "Arora's", storage: 'local' });
+    expect(family().members.find((m) => m.id === viewer())?.fullName).toBe('Neha Arora');
+    expect(store().cloud).toBeUndefined();
+  });
+
+  it('writes no papers of a cloud-only family to the device, and starts its sync again', async () => {
+    signedInFamily();
+    store().saveNote({ title: 'Locker', body: 'SBI 214', onlyMe: false });
+    useApp.setState((d) => {
+      if (d.cloud) d.cloud.sync['fam-1'].cursor = 99;
+    });
+    store().setCloudOnly('fam-1', true);
+    await flushSaves();
+    const saved = JSON.parse(mockMemory.get('almari-state') as string).state;
+    expect(saved.families['fam-1'].notes).toEqual([]);
+    expect(saved.families['fam-1'].members).toEqual([]);
+    expect(saved.cloud.sync['fam-1'].cursor).toBe(0);
+    expect(JSON.stringify(saved)).not.toContain('SBI 214');
+    expect(family().notes).toHaveLength(1); // still open in memory
+    store().setCloudOnly('fam-1', false);
+    await flushSaves();
+    expect(JSON.parse(mockMemory.get('almari-state') as string).state.families['fam-1'].notes).toHaveLength(1);
+  });
+
+  it('sets and clears the family year', () => {
+    signedInFamily();
+    store().setEstablishedYear(1931);
+    expect(family().establishedYear).toBe(1931);
+    store().setEstablishedYear(undefined);
+    expect(family().establishedYear).toBeUndefined();
   });
 });
 

@@ -22,7 +22,8 @@ const PROMISES: { icon: IconName; tint: Tint; title: string; line: string }[] = 
 export default function Welcome() {
   const ctx = useCtx();
   const startSample = useApp((s) => s.startSample);
-  if (ctx) return <Redirect href="/" />;
+  const noAccount = useApp((s) => !!s.device.noAccount);
+  if (ctx || noAccount) return <Redirect href={ctx ? '/' : '/start/you'} />;
 
   return (
     <Screen back={false} testID="welcome">
@@ -48,6 +49,16 @@ export default function Welcome() {
       <View style={styles.actions}>
         <Button label="Get started" testID="get-started" onPress={() => router.push('/auth/sign-up')} />
         <Button label="I already have an account" variant="secondary" testID="have-account" onPress={() => router.push('/auth/sign-in')} />
+        <Button
+          label="Use on this phone only, no account"
+          variant="ghost"
+          icon="Smartphone"
+          testID="no-account"
+          onPress={() => {
+            useApp.getState().useWithoutAccount();
+            router.push('/start/you');
+          }}
+        />
         <Button
           label="Explore a sample family"
           variant="ghost"

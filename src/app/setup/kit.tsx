@@ -44,8 +44,8 @@ export default function UseKit() {
   const fromPhoto = async () => {
     setError(undefined);
     const picked = await pickFromPhotos().catch(() => null);
-    if (!picked || 'denied' in picked) return;
-    const found = await readQrFromImage(picked.file.uri).catch(() => null);
+    if (!picked || 'denied' in picked || !picked.files[0]) return;
+    const found = await readQrFromImage(picked.files[0].uri).catch(() => null);
     const entropy = found ? entropyFromKitQr(found) : null;
     if (!entropy) return setError('No Recovery Kit QR code found in that photo. Try a sharper, straight photo, or type the words.');
     await initCrypto();

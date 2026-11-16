@@ -6,6 +6,7 @@ import { Chip } from '@/components/Bits';
 import { Button } from '@/components/Button';
 import { TextField } from '@/components/Fields';
 import { goBack, Screen, Section } from '@/components/Layout';
+import { countFilled, More } from '@/components/More';
 import { checkPhone, checkRequiredText } from '@/domain/validation';
 import { useApp } from '@/store/app-store';
 import { useCtx } from '@/store/hooks';
@@ -47,7 +48,9 @@ export default function ContactScreen() {
         </View>
         <TextField label="Or type it" value={role} onChangeText={setRole} />
       </Section>
-      <TextField label="Notes" value={notes} onChangeText={setNotes} multiline max={200} placeholder="Clinic timings, account number with them…" />
+      <More summary="Notes: clinic timings, account number with them" filled={countFilled(notes)} initiallyOpen={countFilled(notes) > 0} testID="contact-more">
+        <TextField label="Notes" value={notes} onChangeText={setNotes} multiline max={200} placeholder="Clinic timings, account number with them…" />
+      </More>
       {c ? (
         <Button
           label="Delete"

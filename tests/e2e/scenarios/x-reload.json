@@ -1,0 +1,12 @@
+{
+  "profile": "e-neha", "noWebShare": true,
+  "steps": [
+    ["go", "/", 6000],
+    ["shot", "x-01-after-reload"],
+    ["eval", "document.body.innerText.slice(0, 200)"],
+    ["tap", "lock-pin-1"], ["tap", "lock-pin-4"], ["tap", "lock-pin-7"], ["tap", "lock-pin-2"],
+    ["wait", 3000],
+    ["eval", "document.body.innerText.slice(0, 200)"],
+    ["shot", "x-02-after-pin"]
+  ]
+}

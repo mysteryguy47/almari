@@ -43,6 +43,7 @@ export interface FamilyFields {
   createdBy: ID;
   removalRequests: RemovalRequest[];
   dismissedNudges: string[];
+  establishedYear?: number;
 }
 
 export function familyFields(family: Family): FamilyFields {
@@ -53,6 +54,7 @@ export function familyFields(family: Family): FamilyFields {
     createdBy: family.createdBy,
     removalRequests: family.removalRequests,
     dismissedNudges: family.dismissedNudges ?? [],
+    establishedYear: family.establishedYear,
   };
 }
 
@@ -87,7 +89,8 @@ export function diffFamily(prev: Family | undefined, next: Family): Change[] {
     prevFields.createdAt !== nextFields.createdAt ||
     prevFields.createdBy !== nextFields.createdBy ||
     prev?.removalRequests !== next.removalRequests ||
-    prev?.dismissedNudges !== next.dismissedNudges
+    prev?.dismissedNudges !== next.dismissedNudges ||
+    prevFields.establishedYear !== nextFields.establishedYear
   ) {
     changes.push({ id: FAMILY_RECORD_ID, kind: 'family', data: nextFields });
   }
@@ -137,6 +140,8 @@ export function applyRecord(family: Family, kind: RecordKind, id: string, data: 
     if (typeof f.createdBy === 'string') family.createdBy = f.createdBy;
     family.removalRequests = Array.isArray(f.removalRequests) ? f.removalRequests : [];
     family.dismissedNudges = Array.isArray(f.dismissedNudges) ? f.dismissedNudges : [];
+    if (typeof f.establishedYear === 'number') family.establishedYear = f.establishedYear;
+    else delete family.establishedYear;
     return;
   }
   if (kind === 'prefs') {

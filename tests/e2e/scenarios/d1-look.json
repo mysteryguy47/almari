@@ -1,0 +1,22 @@
+{
+  "profile": "d-look",
+  "fresh": true,
+  "steps": [
+    ["go", "/welcome", 6000],
+    ["shot", "d1-01-welcome"],
+    ["tap", "explore-sample"],
+    ["waitFor", "Namaste, Ananya", 15000],
+    ["shot", "d1-02-home"],
+    ["go", "/doc/new?template=pan", 4000],
+    ["shot", "d1-03-doc-new", "full"],
+    ["go", "/task/new", 4000],
+    ["tap", "task-has-due"],
+    ["eval", "(() => { const sw = document.querySelector('[data-testid=\"task-has-due\"]'); return sw ? 'ok' : 'MISSING'; })()"],
+    ["wait", 800],
+    ["shot", "d1-04-task", "full"],
+    ["go", "/bank/new", 4000],
+    ["shot", "d1-05-bank", "full"],
+    ["go", "/settings", 4000],
+    ["shot", "d1-06-settings", "full"]
+  ]
+}

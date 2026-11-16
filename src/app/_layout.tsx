@@ -28,7 +28,16 @@ export default function RootLayout() {
   const ready = (fontsLoaded || !!fontError) && hydrated;
 
   useEffect(() => {
-    if (ready) SplashScreen.hideAsync().catch(() => undefined);
+    if (!ready) return;
+    SplashScreen.hideAsync().catch(() => undefined);
+    // The web app's boot screen (public/index.html) fades out once the first screen is drawn.
+    if (Platform.OS === 'web' && typeof document !== 'undefined') {
+      const boot = document.getElementById('boot');
+      if (boot) {
+        requestAnimationFrame(() => boot.classList.add('gone'));
+        setTimeout(() => boot.remove(), 600);
+      }
+    }
   }, [ready]);
 
   useEffect(() => {

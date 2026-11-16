@@ -7,6 +7,7 @@ import { Button } from '@/components/Button';
 import { Segmented, TextField } from '@/components/Fields';
 import { DeleteItem, NotFound, OnlyMeToggle, OwnerPicker, ownerName } from '@/components/ItemBits';
 import { Card, Screen } from '@/components/Layout';
+import { countFilled, More } from '@/components/More';
 import { ValueRow } from '@/components/Secret';
 import { T } from '@/components/Text';
 import { canSee } from '@/domain/access';
@@ -105,10 +106,17 @@ export default function Login() {
         testID="login-password-input"
         right={<Pressable onPress={() => setPassword(generatePassword())} accessibilityRole="button" accessibilityLabel="Suggest a password" hitSlop={8}><T variant="smallStrong" color="accent">Suggest</T></Pressable>}
       />
-      {kind === 'login' ? <TextField label="Website or app" value={website} onChangeText={setWebsite} autoCapitalize="none" keyboardType="url" /> : null}
-      <TextField label="Notes" value={notes} onChangeText={setNotes} multiline max={300} />
       <OwnerPicker family={family} value={ownerId} onChange={setOwnerId} allowFamily title="Who uses it?" />
       <OnlyMeToggle visible={ownerId === viewerId} value={onlyMe} onChange={setOnlyMe} />
+      <More
+        summary={kind === 'login' ? 'Website or app, notes' : 'Notes'}
+        filled={countFilled(kind === 'login' ? website : '', notes)}
+        initiallyOpen={countFilled(kind === 'login' ? website : '', notes) > 0}
+        testID="login-more"
+      >
+        {kind === 'login' ? <TextField label="Website or app" value={website} onChangeText={setWebsite} autoCapitalize="none" keyboardType="url" /> : null}
+        <TextField label="Notes" value={notes} onChangeText={setNotes} multiline max={300} />
+      </More>
     </Screen>
   );
 }

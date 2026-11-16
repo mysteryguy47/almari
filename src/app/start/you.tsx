@@ -28,10 +28,11 @@ export default function AboutYou() {
   const [invites, setInvites] = useState<InviteRow[]>([]);
   const [asked, setAsked] = useState(false);
   const joined = useApp((s) => Object.keys(s.cloud?.memberships ?? {}).length > 0);
+  const noAccount = useApp((s) => !!s.device.noAccount);
 
   useEffect(() => {
-    invitesForMe().then(setInvites).catch(() => undefined);
-  }, []);
+    if (account) invitesForMe().then(setInvites).catch(() => undefined);
+  }, [account]);
 
   // After asking to join: the family's next sync lets us in; check every few seconds.
   useEffect(() => {
@@ -44,7 +45,7 @@ export default function AboutYou() {
     if (joined) router.replace(nextRoute());
   }, [joined]);
 
-  if (!account) return <Redirect href="/welcome" />;
+  if (!account && !noAccount) return <Redirect href="/welcome" />;
 
   const nameCheck = checkPersonName(fullName);
   const next = () => {
@@ -65,7 +66,7 @@ export default function AboutYou() {
             <T variant="small" color="ink2" testID="join-asked">Asked. You are in as soon as someone in that family opens Almari. Or open the invite link they sent you, which works at once.</T>
           ) : (
             <>
-              <T variant="small" color="ink2">A family invited {account.email}. Open the link they sent you, or ask to join here and anyone in the family lets you in when they next open Almari.</T>
+              <T variant="small" color="ink2">A family invited {account?.email}. Open the link they sent you, or ask to join here and anyone in the family lets you in when they next open Almari.</T>
               <Button
                 label="Ask to join"
                 size="md"

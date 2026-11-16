@@ -23,6 +23,12 @@ export interface PickedFile {
 
 type Remote = (familyId: string, fileId: string) => Promise<Uint8Array | null>;
 let remote: Remote | null = null;
+let keep: (familyId: string) => boolean = () => true;
+
+/** Whether a file fetched from the server stays on this device ("cloud only" families do not keep copies). */
+export function setFileKeepPolicy(policy: (familyId: string) => boolean): void {
+  keep = policy;
+}
 
 export function setFileRemote(fetcher: Remote | null): void {
   remote = fetcher;
@@ -60,7 +66,7 @@ export async function fileBytes(ref: FileRef): Promise<Uint8Array | null> {
   let bytes: Uint8Array | null = await cipherStore.read(ref.id);
   if (!bytes && locked(ref) && remote) {
     bytes = await remote(ref.familyId, ref.id);
-    if (bytes) await cipherStore.write(ref.id, bytes);
+    if (bytes && keep(ref.familyId)) await cipherStore.write(ref.id, bytes);
   }
   if (!bytes) return null;
   if (!locked(ref)) return bytes;

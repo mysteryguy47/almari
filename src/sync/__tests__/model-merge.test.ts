@@ -144,3 +144,22 @@ describe('merging two edits', () => {
     expect(deepEqual({ a: [1, 2] }, { a: [2, 1] })).toBe(false);
   });
 });
+
+describe('the family year', () => {
+  it('travels in the family record and can go back to the eldest member’s year', () => {
+    const family = sample();
+    const set = produce(family, (d) => {
+      d.establishedYear = 1921;
+    });
+    const changes = diffFamily(family, set);
+    expect(changes).toEqual([expect.objectContaining({ id: FAMILY_RECORD_ID, data: expect.objectContaining({ establishedYear: 1921 }) })]);
+    const elsewhere = produce(family, (d) => {
+      applyRecord(d, 'family', FAMILY_RECORD_ID, JSON.parse(JSON.stringify(changes[0].data)));
+    });
+    expect(elsewhere.establishedYear).toBe(1921);
+    const back = produce(elsewhere, (d) => {
+      applyRecord(d, 'family', FAMILY_RECORD_ID, { ...JSON.parse(JSON.stringify(changes[0].data)), establishedYear: undefined });
+    });
+    expect(back.establishedYear).toBeUndefined();
+  });
+});

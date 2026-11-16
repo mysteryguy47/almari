@@ -19,7 +19,7 @@ import { appOrigin, signOutAndForget } from './account';
 import { inviteContext } from './contexts';
 import { queueChanges } from './engine';
 import { allRecords, emptyFamily } from './model';
-import { api, appReplica, deviceName, syncNow } from './runtime';
+import { api, appReplica, deviceName, deviceReady, syncNow } from './runtime';
 import { emptySync, type CloudState } from './types';
 import { approveRequest, checkApproval, makeKit, requestApproval, startFresh, openWithKit, type ApprovalCheck } from './vault';
 
@@ -50,6 +50,8 @@ function currentFamily(): { family: Family; memberId: ID } {
 // ---------------------------------------------------------------- families
 
 export async function createFamily(name: string, you: Pick<Member, 'fullName' | 'dob' | 'gender' | 'phone'>): Promise<Result<ID>> {
+  // Without an account, the family lives on this phone only.
+  if (!useApp.getState().cloud) return useApp.getState().createLocalFamily(name, you);
   try {
     await initCrypto();
     const cloud = cloudOrThrow();
@@ -443,3 +445,121 @@ export async function removeDevice(deviceId: string): Promise<Result> {
     return fail(e);
   }
 }
+
+// ---------------------------------------------------------------- where the papers are kept
+
+export type StorageChoice = 'both' | 'cloud' | 'local';
+
+export function storageOf(familyId: ID): StorageChoice {
+  const s = useApp.getState();
+  if (s.families[familyId]?.storage === 'local') return 'local';
+  return s.device.cloudOnly?.[familyId] ? 'cloud' : 'both';
+}
+
+/** Can this family become phone-only? Only when nobody else is signed in to it. */
+export function canKeepOnPhoneOnly(familyId: ID): { ok: true } | { ok: false; reason: string } {
+  const s = useApp.getState();
+  const family = s.families[familyId];
+  if (!family) return { ok: false, reason: 'No family open' };
+  if (family.storage === 'local') return { ok: true };
+  const others = Object.values(s.cloud?.sync[familyId]?.members ?? {}).filter((u) => u !== s.cloud?.userId).length;
+  if (others > 0) return { ok: false, reason: `Others in ${family.name} use its cloud copy on their phones, so it cannot be kept on this phone only. Start a separate family for papers you want only here.` };
+  return { ok: true };
+}
+
+/** Both (a copy here and in the cloud) or cloud only (nothing kept here). */
+export async function setCloudOnly(familyId: ID, on: boolean): Promise<Result> {
+  try {
+    if (!useApp.getState().cloud?.memberships[familyId]) return fail('This family is not in the cloud');
+    if (on) await syncNow(); // send anything waiting before the copies go
+    useApp.getState().setCloudOnly(familyId, on);
+    if (on) {
+      const { sweepLocalCopies } = await import('./runtime');
+      await sweepLocalCopies(familyId);
+    } else {
+      void syncNow(); // brings the files down again
+    }
+    return ok(undefined);
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+/** Moves a family off the server: everything is brought to this phone first, then deleted from the server. */
+export async function keepOnThisPhoneOnly(familyId: ID): Promise<Result> {
+  const allowed = canKeepOnPhoneOnly(familyId);
+  if (!allowed.ok) return fail(allowed.reason);
+  try {
+    await initCrypto();
+    const s0 = useApp.getState();
+    const memberId = s0.cloud?.memberships[familyId]?.memberId;
+    if (!memberId) return fail('This family is not in the cloud');
+    await syncNow();
+    // Every file must be on this phone before the cloud copy goes.
+    const { cipherStore } = await import('@/store/files');
+    for (const doc of useApp.getState().families[familyId]?.documents ?? []) {
+      for (const f of doc.files) {
+        if (!f.key || (await cipherStore.has(f.id))) continue;
+        const bytes = await api().downloadFile(familyId, f.id);
+        if (!bytes) return fail(`${doc.title} could not be brought to this phone. Nothing was changed. Try again with internet.`);
+        await cipherStore.write(f.id, bytes);
+      }
+    }
+    const files = await api().listFiles(familyId);
+    for (let i = 0; i < files.length; i += 500) await api().removeFiles(familyId, files.slice(i, i + 500));
+    await api().leaveFamily(familyId); // the last member leaving deletes the family and all its records
+    useApp.setState((d) => {
+      const family = d.families[familyId];
+      if (!family) return;
+      family.storage = 'local';
+      family.localViewerId = memberId;
+      if (d.cloud) {
+        delete d.cloud.memberships[familyId];
+        delete d.cloud.familyKeys[familyId];
+        delete d.cloud.sync[familyId];
+      }
+      if (d.device.cloudOnly) delete d.device.cloudOnly[familyId];
+    });
+    return ok(undefined);
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+/** Puts a phone-only family in the cloud: encrypted on this phone, then uploaded. */
+export async function moveToCloud(familyId: ID): Promise<Result> {
+  try {
+    await initCrypto();
+    const s0 = useApp.getState();
+    const family = s0.families[familyId];
+    const cloud = s0.cloud;
+    if (!family || family.storage !== 'local' || !family.localViewerId) return fail('This family is already in the cloud');
+    if (!cloud || !deviceReady()) return fail('Create an account or sign in first');
+    if (!canJoinAnotherFamily({ familyIds: Object.keys(cloud.memberships) })) return fail('You can be in up to 3 families in the cloud. Leave one first.');
+    const memberId = family.localViewerId;
+    const familyKey = randomKey();
+    await api().createFamily(familyId, memberId, seal(familyKey, myPublicKey()));
+    useApp.setState((d) => {
+      const f = d.families[familyId];
+      if (!f || !d.cloud) return;
+      d.cloud.memberships[familyId] = { memberId };
+      d.cloud.familyKeys[familyId] = { '1': toB64(familyKey) };
+      d.cloud.sync[familyId] = emptySync();
+      delete f.storage;
+      delete f.localViewerId;
+      const me = f.members.find((m) => m.id === memberId);
+      if (me) {
+        me.kind = 'account';
+        me.accountId = d.cloud.userId;
+        me.email = d.cloud.email;
+        me.status = 'active';
+      }
+    });
+    queueChanges(appReplica, familyId, allRecords(useApp.getState().families[familyId]));
+    await syncNow();
+    return ok(undefined);
+  } catch (e) {
+    return fail(e);
+  }
+}
+

@@ -79,6 +79,7 @@ export async function afterSignIn(): Promise<void> {
     d.cloud = cloudFor(user, d.cloud);
     d.device.lockedOut = false;
     d.device.pinFailures = 0;
+    d.device.noAccount = false;
   });
   useUi.getState().unlock();
   void api().clearSignInFailures().catch(() => undefined);
@@ -110,10 +111,11 @@ export async function afterSignIn(): Promise<void> {
 export function nextRoute(): Href {
   const s = useApp.getState();
   const pendingInvite = useUi.getState().pendingInvite;
-  if (!s.cloud) return '/welcome';
+  const localFamilies = Object.values(s.families).filter((f) => f.storage === 'local').length;
+  if (!s.cloud) return s.device.noAccount || localFamilies ? (localFamilies ? (s.device.pinHash ? '/' : '/start/pin') : '/start/you') : '/welcome';
   if (!deviceReady()) return '/setup/device';
   if (pendingInvite) return { pathname: '/join/[id]', params: { id: pendingInvite.id } };
-  if (Object.keys(s.cloud.memberships).length === 0) return '/start/you';
+  if (Object.keys(s.cloud.memberships).length === 0 && localFamilies === 0) return '/start/you';
   if (!s.device.pinHash) return '/start/pin';
   return '/';
 }

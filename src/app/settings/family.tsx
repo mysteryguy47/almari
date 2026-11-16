@@ -1,8 +1,8 @@
 import { Redirect, router } from 'expo-router';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
-import { Avatar } from '@/components/Bits';
+import { Avatar, Chip, Nameplate } from '@/components/Bits';
 import { Button } from '@/components/Button';
 import { TextField } from '@/components/Fields';
 import { Card, Row, Screen, Section } from '@/components/Layout';
@@ -10,8 +10,9 @@ import { SharingChoice } from '@/components/SharingChoice';
 import { Sheet } from '@/components/Sheet';
 import { SlideToConfirm } from '@/components/SlideToConfirm';
 import { T } from '@/components/Text';
+import { WheelColumn, WheelFrame } from '@/components/Wheel';
 import { displayName, familyRow, findMember } from '@/domain/access';
-import { canApproveRemoval } from '@/domain/family-rules';
+import { canApproveRemoval, eldestBirthYear, establishedYear } from '@/domain/family-rules';
 import type { PersonalSharing } from '@/domain/types';
 import { checkFamilyName, LIMITS } from '@/domain/validation';
 import { useApp } from '@/store/app-store';
@@ -45,6 +46,8 @@ export default function FamilySettings() {
           <Button label="Save the name" size="md" onPress={() => { renameFamily(name); toast('Renamed. Everyone sees the new name.', { tone: 'success' }); }} />
         ) : null}
       </Section>
+
+      <EstablishedYear />
 
       <Section title="Who sees personal papers">
         <SharingChoice value={family.personalSharing} onChange={(v) => v !== family.personalSharing && setPendingSharing(v)} />
@@ -136,3 +139,55 @@ const styles = StyleSheet.create({
   request: { padding: space.lg, gap: 4 },
   row: { flexDirection: 'row', gap: space.md, marginTop: space.sm, alignItems: 'center', flexWrap: 'wrap' },
 });
+
+/** The nameplate's "Est." year: set by hand, or the eldest member's birth year. */
+function EstablishedYear() {
+  const ctx = useCtx();
+  const setEstablishedYear = useApp((st) => st.setEstablishedYear);
+  const thisYear = new Date().getFullYear();
+  const current = ctx ? establishedYear(ctx.family) : undefined;
+  const [year, setYear] = useState(current ?? thisYear);
+  const years = useMemo(() => Array.from({ length: thisYear - 1850 + 1 }, (_, i) => ({ value: thisYear - i, label: String(thisYear - i) })), [thisYear]);
+  if (!ctx) return null;
+  const eldest = eldestBirthYear(ctx.family);
+  const custom = !!ctx.family.establishedYear;
+  return (
+    <Section title="Year on the nameplate">
+      <View style={yearStyles.preview}>
+        <Nameplate name={ctx.family.name} est={year} />
+      </View>
+      <WheelFrame>
+        <WheelColumn items={years} value={year} onChange={setYear} width={110} label="Year of establishment" testID="family-year" />
+      </WheelFrame>
+      <View style={yearStyles.actions}>
+        {year !== current ? (
+          <Button
+            label={`Save ${year}`}
+            size="md"
+            onPress={() => {
+              setEstablishedYear(year);
+              toast(`The nameplate now says Est. ${year}`, { tone: 'success' });
+            }}
+            testID="family-year-save"
+          />
+        ) : null}
+        {custom && eldest ? (
+          <Chip
+            label={`Use the eldest member’s birth year (${eldest})`}
+            onPress={() => {
+              setEstablishedYear(undefined);
+              setYear(eldest);
+            }}
+          />
+        ) : null}
+        <T variant="small" color="ink3">{custom ? 'Set by your family.' : eldest ? 'From the eldest member’s birth year. Choose another if the family dates further back.' : 'Choose the year the family was established.'}</T>
+      </View>
+    </Section>
+  );
+}
+
+const yearStyles = StyleSheet.create({
+  preview: { alignItems: 'center', marginBottom: space.md },
+  actions: { gap: space.sm, marginTop: space.md, alignItems: 'flex-start' },
+});
+

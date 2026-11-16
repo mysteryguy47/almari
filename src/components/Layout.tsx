@@ -1,6 +1,7 @@
 import { router } from 'expo-router';
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import Animated, { FadeIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { IconName } from '@/domain/icons';
@@ -33,11 +34,19 @@ export interface ScreenProps {
   testID?: string;
 }
 
+/** Soft depth for cards in the light theme; the dark theme stays flat (shadows read as dirt on dark). */
+export function useLift(): ViewStyle | null {
+  const { scheme } = useTheme();
+  return scheme === 'light' ? ({ boxShadow: '0 1px 2px rgba(51, 36, 15, 0.04), 0 6px 20px rgba(51, 36, 15, 0.05)' } as ViewStyle) : null;
+}
+
 export function Screen({ title, large, subtitle, back = true, right, children, footer, bottomInset = 0, scroll = true, testID }: ScreenProps) {
   const { palette } = useTheme();
   const insets = useSafeAreaInsets();
+  // Once the page scrolls, the header gets a hairline edge so it reads as sitting above the content.
+  const [scrolled, setScrolled] = useState(false);
   const body = (
-    <View style={styles.column}>
+    <Animated.View entering={FadeIn.duration(240)} style={styles.column}>
       {large && title ? (
         <View style={styles.largeHeader}>
           <T variant="display" accessibilityRole="header">{title}</T>
@@ -45,7 +54,7 @@ export function Screen({ title, large, subtitle, back = true, right, children, f
         </View>
       ) : null}
       {children}
-    </View>
+    </Animated.View>
   );
   return (
     <KeyboardAvoidingView
@@ -53,7 +62,7 @@ export function Screen({ title, large, subtitle, back = true, right, children, f
       style={[styles.fill, { backgroundColor: palette.bg }]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <View style={[styles.header, { paddingTop: insets.top + space.sm }]}>
+      <View style={[styles.header, { paddingTop: insets.top + space.sm, borderBottomColor: scrolled ? palette.line : 'transparent', backgroundColor: palette.bg }]}>
         <View style={styles.headerInner}>
           {back ? (
             <Pressable
@@ -82,6 +91,11 @@ export function Screen({ title, large, subtitle, back = true, right, children, f
           keyboardShouldPersistTaps="handled"
           automaticallyAdjustKeyboardInsets
           showsVerticalScrollIndicator={false}
+          scrollEventThrottle={32}
+          onScroll={(e) => {
+            const past = e.nativeEvent.contentOffset.y > 4;
+            if (past !== scrolled) setScrolled(past);
+          }}
         >
           {body}
         </ScrollView>
@@ -99,19 +113,25 @@ export function Screen({ title, large, subtitle, back = true, right, children, f
 
 export function Card({ children, style, padded = true }: { children: ReactNode; style?: StyleProp<ViewStyle>; padded?: boolean }) {
   const { palette } = useTheme();
+  const lift = useLift();
   return (
-    <View style={[styles.card, { backgroundColor: palette.surface, borderColor: palette.line }, padded ? styles.cardPad : null, style]}>
+    <View style={[styles.card, { backgroundColor: palette.surface, borderColor: palette.line }, lift, padded ? styles.cardPad : null, style]}>
       {children}
     </View>
   );
 }
 
-export function Section({ title, action, children, style }: { title?: string; action?: ReactNode; children: ReactNode; style?: ViewStyle }) {
+export function Section({ title, action, children, style, required }: { title?: string; action?: ReactNode; children: ReactNode; style?: ViewStyle; required?: boolean }) {
   return (
     <View style={[styles.section, style]}>
       {title || action ? (
         <View style={styles.sectionHead}>
-          {title ? <T variant="label" color="ink2" accessibilityRole="header">{title}</T> : <View />}
+          {title ? (
+            <T variant="label" color="ink2" accessibilityRole="header">
+              {title}
+              {required ? <T variant="label" color="sindoor"> *</T> : null}
+            </T>
+          ) : <View />}
           {action}
         </View>
       ) : null}
@@ -189,8 +209,9 @@ export function Divider() {
 
 export function Tile({ icon, label, tint, onPress, testID, badge }: { icon: IconName; label: string; tint: Tint; onPress: () => void; testID?: string; badge?: string }) {
   const { palette } = useTheme();
+  const lift = useLift();
   return (
-    <Pressy testID={testID} onPress={onPress} outerStyle={styles.tileOuter} style={[styles.tile, { backgroundColor: palette.surface, borderColor: palette.line }]} accessibilityLabel={label}>
+    <Pressy testID={testID} onPress={onPress} outerStyle={styles.tileOuter} style={[styles.tile, { backgroundColor: palette.surface, borderColor: palette.line }, lift]} accessibilityLabel={label}>
       <IconTile icon={icon} tint={tint} size={44} />
       <T variant="smallStrong" numberOfLines={2}>{label}</T>
       {badge ? <T variant="small" color="ink2">{badge}</T> : null}
@@ -202,7 +223,7 @@ const styles = StyleSheet.create({
   fill: { flex: 1 },
   column: { width: '100%', maxWidth: MAX_WIDTH, alignSelf: 'center', paddingHorizontal: space.xl },
   scroll: { paddingTop: space.sm },
-  header: { width: '100%' },
+  header: { width: '100%', borderBottomWidth: StyleSheet.hairlineWidth, zIndex: 2 },
   headerInner: {
     width: '100%', maxWidth: MAX_WIDTH, alignSelf: 'center', paddingHorizontal: space.xl, paddingBottom: space.sm,
     flexDirection: 'row', alignItems: 'center', gap: space.md, minHeight: 52,
@@ -211,6 +232,7 @@ const styles = StyleSheet.create({
   back: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', borderWidth: StyleSheet.hairlineWidth },
   largeHeader: { gap: 2, marginBottom: space.lg },
   footer: { borderTopWidth: StyleSheet.hairlineWidth, paddingTop: space.md },
+  // Content stays inside the rounded corners; the soft shadow is drawn outside and is not clipped.
   card: { borderRadius: radius.lg, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },
   cardPad: { padding: space.lg },
   section: { marginBottom: space.xxl, gap: space.sm },

@@ -1,0 +1,18 @@
+{
+  "profile": "p-prod", "fresh": true, "base": "http://localhost:4321",
+  "steps": [
+    ["go", "/welcome", 300],
+    ["shot", "p1-00-boot"],
+    ["wait", 4000],
+    ["eval", "document.getElementById('boot') ? 'EXPECTED the boot screen gone' : 'boot screen gone'"],
+    ["tap", "explore-sample"],
+    ["waitFor", "Namaste, Ananya", 10000],
+    ["eval", "(async () => { const btn = document.querySelector('[data-testid=\"tab-locker\"]'); btn.click(); await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))); return document.body.innerText.includes('Locker') ? 'locker drawn on the next frame' : 'EXPECTED locker at once'; })()"],
+    ["go", "/task/new", 3000],
+    ["waitFor", "New task", 5000],
+    ["go", "/doc/new?template=pan", 3000],
+    ["waitFor", "Photo or file", 5000],
+    ["go", "/settings/family", 3000],
+    ["waitFor", "Year on the nameplate", 5000]
+  ]
+}

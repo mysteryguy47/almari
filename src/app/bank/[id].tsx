@@ -2,11 +2,13 @@ import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
-import { Chip, Stamp } from '@/components/Bits';
+import { Stamp } from '@/components/Bits';
 import { Button } from '@/components/Button';
 import { ChipChoice, TextField } from '@/components/Fields';
 import { DeleteItem, NotFound, OnlyMeToggle, OwnerPicker, ownerName } from '@/components/ItemBits';
 import { Card, Row, Screen, Section } from '@/components/Layout';
+import { ChipScroller } from '@/components/ChipScroller';
+import { countFilled, More, MoreGroup } from '@/components/More';
 import { ValueRow } from '@/components/Secret';
 import { T } from '@/components/Text';
 import { canSee, findMember, visibleTo } from '@/domain/access';
@@ -15,6 +17,7 @@ import type { BankAccountType } from '@/domain/types';
 import { checkIfsc, checkPhone, checkRequiredText, compactUpper, digitsOnly, OK } from '@/domain/validation';
 import { shareText } from '@/lib/device';
 import { ACCOUNT_TYPES } from '@/lib/options';
+import { lookupIfsc } from '@/lib/ifsc';
 import { useApp } from '@/store/app-store';
 import { useCtx } from '@/store/hooks';
 import { toast } from '@/store/ui-store';
@@ -44,6 +47,7 @@ export default function BankAccountScreen() {
   const [notes, setNotes] = useState(a?.notes ?? '');
   const [onlyMe, setOnlyMe] = useState(a?.onlyMe ?? false);
   const [tried, setTried] = useState(false);
+  const [ifscInfo, setIfscInfo] = useState<{ status: 'looking' | 'unknown' | 'offline' } | { status: 'found'; text: string }>();
 
   if (!ctx) return <Redirect href="/" />;
   const { family, viewerId } = ctx;
@@ -114,7 +118,25 @@ export default function BankAccountScreen() {
     setIfsc(value);
     const name = bankFromIfsc(value);
     if (name && !bank.trim()) setBank(name);
+    const code = value.replace(/\s/g, '').toUpperCase();
+    if (code.length === 11) {
+      setIfscInfo({ status: 'looking' });
+      lookupIfsc(code).then((r) => {
+        if (r.status !== 'found') return setIfscInfo({ status: r.status });
+        setIfscInfo({ status: 'found', text: [r.info.bank, r.info.branch, r.info.city].filter(Boolean).join(' · ') });
+        if (!bank.trim() || bank.trim() === name) setBank(r.info.bank);
+        setBranch((current) => current.trim() || r.info.branch);
+      });
+    } else {
+      setIfscInfo(undefined);
+    }
   };
+  const ifscHelper =
+    ifscInfo?.status === 'looking' ? 'Looking up the branch…'
+      : ifscInfo?.status === 'found' ? ifscInfo.text
+        : ifscInfo?.status === 'unknown' ? 'No branch found for this IFSC. Check it, or type the branch under More details.'
+          : ifscInfo?.status === 'offline' ? 'Offline: type the branch under More details if you like.'
+            : 'The bank and branch fill in from the IFSC';
   const save = () => {
     setTried(true);
     if (checks.bank.level === 'error' || checks.number.level === 'error' || !ownerId) {
@@ -136,29 +158,46 @@ export default function BankAccountScreen() {
   return (
     <Screen title={a ? 'Edit account' : 'New bank account'} footer={<Button label="Save" onPress={save} testID="bank-save" />} testID="bank-edit">
       <OwnerPicker family={family} value={ownerId} onChange={setOwnerId} />
-      <TextField label="IFSC" value={ifsc} onChangeText={onIfsc} autoCapitalize="characters" check={checks.ifsc} helper="Typing the IFSC fills in the bank" testID="bank-ifsc" />
+      <TextField label="Account number" value={accountNumber} onChangeText={setAccountNumber} keyboardType="number-pad" required check={checks.number} showCheck={tried} testID="bank-number" />
+      <TextField
+        label="IFSC"
+        value={ifsc}
+        onChangeText={onIfsc}
+        autoCapitalize="characters"
+        check={checks.ifsc}
+        helper={ifscHelper}
+        testID="bank-ifsc"
+      />
       <TextField label="Bank" value={bank} onChangeText={setBank} required check={checks.bank} showCheck={tried} testID="bank-name" />
-      {!bank ? (
-        <View style={styles.chips}>
-          {COMMON_BANKS.slice(0, 8).map((b) => <Chip key={b} label={b} onPress={() => setBank(b)} />)}
-        </View>
-      ) : null}
+      {!bank ? <ChipScroller options={COMMON_BANKS.slice(0, 10)} onPick={setBank} testID="bank-suggestions" /> : null}
       <Section title="Account type">
         <ChipChoice options={ACCOUNT_TYPES} value={type} onChange={setType} testID="bank-type" />
       </Section>
-      <TextField label="Account number" value={accountNumber} onChangeText={setAccountNumber} keyboardType="number-pad" required check={checks.number} showCheck={tried} testID="bank-number" />
-      <TextField label="Branch" value={branch} onChangeText={setBranch} />
-      <TextField label="Account holder, as printed" value={holder} onChangeText={setHolder} />
-      <TextField label="Nominee" value={nominee} onChangeText={setNominee} helper="Worth checking for every account" />
-      <TextField label="Customer ID / CIF" value={customerId} onChangeText={setCustomerId} autoCapitalize="none" />
-      <TextField label="Registered mobile" value={registeredMobile} onChangeText={setRegisteredMobile} keyboardType="phone-pad" check={checkPhone(registeredMobile)} />
-      <TextField label="UPI IDs" value={upiIds} onChangeText={setUpiIds} autoCapitalize="none" placeholder="name@bank" />
-      <Section title="Net banking (hidden until fingerprint or PIN)">
-        <TextField label="Net-banking ID" value={netbankingId} onChangeText={setNetbankingId} autoCapitalize="none" />
-        <TextField label="Net-banking password" value={netbankingPassword} onChangeText={setNetbankingPassword} secure />
-      </Section>
-      <TextField label="Notes" value={notes} onChangeText={setNotes} multiline max={300} />
       <OnlyMeToggle visible={ownerId === viewerId} value={onlyMe} onChange={setOnlyMe} />
+      <More
+        summary="Branch, holder, customer ID, net banking, nominee, UPI"
+        filled={countFilled(branch, holder, customerId, registeredMobile, netbankingId, netbankingPassword, nominee, upiIds, notes)}
+        initiallyOpen={!!a && countFilled(a.branch, a.holder, a.customerId, a.registeredMobile, a.netbankingId, a.nominee, a.upiIds, a.notes) > 0}
+        testID="bank-more"
+      >
+        <MoreGroup title="Branch and holder">
+          <TextField label="Branch" value={branch} onChangeText={setBranch} testID="bank-branch" />
+          <TextField label="Account holder, as printed" value={holder} onChangeText={setHolder} />
+          <TextField label="Customer ID / CIF" value={customerId} onChangeText={setCustomerId} autoCapitalize="none" />
+          <TextField label="Registered mobile" value={registeredMobile} onChangeText={setRegisteredMobile} keyboardType="phone-pad" check={checkPhone(registeredMobile)} />
+        </MoreGroup>
+        <MoreGroup title="Net banking (hidden until fingerprint or PIN)">
+          <TextField label="Net-banking ID" value={netbankingId} onChangeText={setNetbankingId} autoCapitalize="none" />
+          <TextField label="Net-banking password" value={netbankingPassword} onChangeText={setNetbankingPassword} secure />
+        </MoreGroup>
+        <MoreGroup title="Nominee">
+          <TextField label="Nominee" value={nominee} onChangeText={setNominee} helper="Worth checking for every account: the money map flags accounts without one" />
+        </MoreGroup>
+        <MoreGroup title="UPI and notes">
+          <TextField label="UPI IDs" value={upiIds} onChangeText={setUpiIds} autoCapitalize="none" placeholder="name@bank" />
+          <TextField label="Notes" value={notes} onChangeText={setNotes} multiline max={300} />
+        </MoreGroup>
+      </More>
     </Screen>
   );
 }

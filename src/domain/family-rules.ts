@@ -32,8 +32,14 @@ export function familyNameSuggestions(fullName: string): string[] {
   return [possessive, `${surname} Parivaar`, `${surname} Family`];
 }
 
-/** The earliest birth year in the family, for the nameplate's "Est." line. */
+/** The nameplate's "Est." year: the one the family set, or else the earliest birth year in the family. */
 export function establishedYear(family: Family): number | undefined {
+  if (family.establishedYear) return family.establishedYear;
+  return eldestBirthYear(family);
+}
+
+/** The earliest birth year among the family's people (not pets). */
+export function eldestBirthYear(family: Family): number | undefined {
   const years = family.members
     .filter((m) => !m.isPet)
     .map((m) => parseDob(m.dob)?.year)

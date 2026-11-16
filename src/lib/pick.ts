@@ -22,7 +22,8 @@ function fromImageAsset(asset: ImagePicker.ImagePickerAsset, fallbackName: strin
   return { uri: asset.uri, name, mime, size: asset.fileSize ?? asset.file?.size, blob: asset.file };
 }
 
-export type PickResult = { file: PickedFile } | { denied: true } | null;
+/** One or more files (Photos and Files allow several at once), permission refused, or cancelled. */
+export type PickResult = { files: PickedFile[] } | { denied: true } | null;
 
 export async function pickFromCamera(): Promise<PickResult> {
   if (Platform.OS !== 'web') {
@@ -31,18 +32,21 @@ export async function pickFromCamera(): Promise<PickResult> {
   }
   const result = await ImagePicker.launchCameraAsync({ mediaTypes: 'images', quality: 0.7 });
   if (result.canceled || !result.assets?.[0]) return null;
-  return { file: fromImageAsset(result.assets[0], `photo-${stamp()}.jpg`) };
+  return { files: [fromImageAsset(result.assets[0], `photo-${stamp()}.jpg`)] };
 }
 
-export async function pickFromPhotos(): Promise<PickResult> {
-  const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: 'images', quality: 0.8 });
-  if (result.canceled || !result.assets?.[0]) return null;
-  return { file: fromImageAsset(result.assets[0], `photo-${stamp()}.jpg`) };
+/** Up to `limit` photos at once. */
+export async function pickFromPhotos(limit = 1): Promise<PickResult> {
+  const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: 'images', quality: 0.8, allowsMultipleSelection: limit > 1, selectionLimit: limit, orderedSelection: true });
+  if (result.canceled || !result.assets?.length) return null;
+  return { files: result.assets.slice(0, limit).map((a, i) => fromImageAsset(a, `photo-${stamp()}-${i + 1}.jpg`)) };
 }
 
-export async function pickFromFiles(): Promise<PickResult> {
-  const result = await DocumentPicker.getDocumentAsync({ type: ACCEPTED_MIME_TYPES, copyToCacheDirectory: true, multiple: false });
-  if (result.canceled || !result.assets?.[0]) return null;
-  const asset = result.assets[0];
-  return { file: { uri: asset.uri, name: asset.name, mime: asset.mimeType, size: asset.size ?? asset.file?.size, blob: asset.file } };
+/** Up to `limit` files at once: PDF, Word, Excel, photos. */
+export async function pickFromFiles(limit = 1): Promise<PickResult> {
+  const result = await DocumentPicker.getDocumentAsync({ type: ACCEPTED_MIME_TYPES, copyToCacheDirectory: true, multiple: limit > 1 });
+  if (result.canceled || !result.assets?.length) return null;
+  return {
+    files: result.assets.slice(0, limit).map((asset) => ({ uri: asset.uri, name: asset.name, mime: asset.mimeType, size: asset.size ?? asset.file?.size, blob: asset.file })),
+  };
 }

@@ -43,6 +43,10 @@ export interface Device {
   deviceId: string;
   /** Five wrong PINs: the person must sign in again. Nothing is wiped. */
   lockedOut?: boolean;
+  /** Using Almari on this phone only, without an account. */
+  noAccount?: boolean;
+  /** Families this device keeps no copy of ("cloud only"). They load from the server each time. */
+  cloudOnly?: Record<ID, true>;
 }
 
 export interface Session {
@@ -84,12 +88,20 @@ export interface AppState extends PersistedState {
   clearLocal(): void;
 
   // ---- families
+  /** Starts using Almari on this phone only, without an account. */
+  useWithoutAccount(): void;
+  /** A new family kept on this phone only. */
+  createLocalFamily(name: string, you: Pick<Member, 'fullName' | 'dob' | 'gender' | 'phone'>): Result<ID>;
+  /** Cloud only on this device (true), or keep a copy here too (false). */
+  setCloudOnly(familyId: ID, on: boolean): void;
   /** Puts a family the account just created or joined on this device. */
   addFamily(family: Family, open: boolean): void;
   /** Takes a family off this device (left it, removed, or deleted). */
   forgetFamily(familyId: ID): void;
   switchFamily(familyId: ID): void;
   renameFamily(name: string): void;
+  /** The nameplate's year; undefined goes back to the eldest member's birth year. */
+  setEstablishedYear(year: number | undefined): void;
   setPersonalSharing(value: PersonalSharing): void;
   /** Before leaving: the viewer's personal items and member card leave the family with them. */
   leaveLocally(): void;
@@ -149,6 +161,7 @@ export function viewerIdOf(s: PersistedState): ID | undefined {
   const family = familyOf(s);
   if (!family) return undefined;
   if (family.isSample) return s.session.viewAs ?? SAMPLE_VIEWER_ID;
+  if (family.storage === 'local') return family.localViewerId;
   const memberId = s.cloud?.memberships[family.id]?.memberId;
   if (!memberId || !family.members.some((m) => m.id === memberId)) return undefined;
   return memberId;
@@ -249,6 +262,40 @@ export const useApp = create<AppState>()(
         },
 
         // ---------------------------------------------------------- families
+        useWithoutAccount() {
+          set((s) => {
+            s.device.noAccount = true;
+          });
+        },
+
+        createLocalFamily(name, you) {
+          const familyCount = Object.values(get().families).filter((f) => !f.isSample).length;
+          if (familyCount >= 3) return fail('You can be in up to 3 families. Leave one to start another.');
+          const familyId = newId();
+          const memberId = newId();
+          set((s) => {
+            const now = Date.now();
+            s.families[familyId] = {
+              id: familyId, name: name.trim(), createdAt: now, createdBy: memberId, personalSharing: 'family', storage: 'local', localViewerId: memberId,
+              members: [{ id: memberId, kind: 'account', fullName: you.fullName.trim(), dob: you.dob, gender: you.gender, phone: you.phone, ids: {}, status: 'active', addedBy: memberId, createdAt: now }],
+              documents: [], logins: [], bankAccounts: [], cards: [], notes: [], tasks: [], contacts: [],
+              activity: [{ id: newId(), at: now, by: memberId, kind: 'member', text: `started ${name.trim()}` }],
+              reminderPrefs: {}, removalRequests: [], dismissedNudges: [],
+            };
+            s.session = { familyId };
+          });
+          return ok(familyId);
+        },
+
+        setCloudOnly(familyId, on) {
+          set((s) => {
+            const map = { ...(s.device.cloudOnly ?? {}) };
+            if (on) map[familyId] = true;
+            else delete map[familyId];
+            s.device.cloudOnly = map;
+          });
+        },
+
         addFamily(family, open) {
           set((s) => {
             s.families[family.id] = family;
@@ -287,6 +334,15 @@ export const useApp = create<AppState>()(
             const old = family.name;
             family.name = name.trim();
             log(family, viewer, 'changed', `renamed the family from ${old} to ${family.name}`);
+          });
+        },
+
+        setEstablishedYear(year) {
+          onFamily((family, viewer) => {
+            if (family.establishedYear === year) return;
+            if (year) family.establishedYear = year;
+            else delete family.establishedYear;
+            log(family, viewer, 'changed', year ? `set the family's year to ${year}` : "set the family's year back to the eldest member's birth year");
           });
         },
 
@@ -696,9 +752,21 @@ export const useApp = create<AppState>()(
       name: 'almari-state',
       version: 2,
       storage: batchedStorage<PersistedState>(kv),
-      partialize: (s): PersistedState => ({
-        version: s.version, families: s.families, session: s.session, device: s.device, cloud: s.cloud,
-      }),
+      // A "cloud only" family is not written to this device: only an empty shell, and its sync
+      // state starts again from zero, so it loads from the server next time. Unsent changes stay
+      // until they are sent.
+      partialize: (s): PersistedState => {
+        const cloudOnly = Object.keys(s.device.cloudOnly ?? {}).filter((id) => s.families[id] && s.cloud?.memberships[id]);
+        if (!cloudOnly.length) return { version: s.version, families: s.families, session: s.session, device: s.device, cloud: s.cloud };
+        const families = { ...s.families };
+        const sync = { ...(s.cloud?.sync ?? {}) };
+        for (const id of cloudOnly) {
+          const f = s.families[id];
+          families[id] = { ...f, members: [], documents: [], logins: [], bankAccounts: [], cards: [], notes: [], tasks: [], contacts: [], activity: [], reminderPrefs: {}, removalRequests: [] };
+          if (sync[id]) sync[id] = { ...sync[id], cursor: 0, base: {}, locked: {} };
+        }
+        return { version: s.version, families, session: s.session, device: s.device, cloud: s.cloud ? { ...s.cloud, sync } : undefined };
+      },
       // Version 1 was the prototype: simulated accounts and test papers on this device only.
       // Real accounts start clean; only the theme carries over.
       migrate: (persisted, version) => {

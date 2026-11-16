@@ -10,6 +10,7 @@ import { T } from '@/components/Text';
 import { familyNameSuggestions, MAX_FAMILIES_PER_PERSON } from '@/domain/family-rules';
 import type { Gender } from '@/domain/types';
 import { checkFamilyName, LIMITS } from '@/domain/validation';
+import { useApp } from '@/store/app-store';
 import { useAccount } from '@/store/hooks';
 import { createFamily } from '@/sync/actions';
 import { toast } from '@/store/ui-store';
@@ -19,13 +20,14 @@ import { space } from '@/theme/tokens';
 export default function NameFamily() {
   const params = useLocalSearchParams<{ fullName?: string; dob?: string; gender?: string; phone?: string; again?: string }>();
   const account = useAccount();
+  const noAccount = useApp((s) => !!s.device.noAccount);
   const fullName = params.fullName || account?.name || '';
   const suggestions = familyNameSuggestions(fullName);
   const [name, setName] = useState(suggestions[0] ?? '');
   const [tried, setTried] = useState(false);
   const [error, setError] = useState<string>();
   const [busy, setBusy] = useState(false);
-  if (!account) return <Redirect href="/welcome" />;
+  if (!account && !noAccount) return <Redirect href="/welcome" />;
   const again = params.again === '1';
 
   const check = checkFamilyName(name);
@@ -68,11 +70,18 @@ export default function NameFamily() {
       ) : null}
       <TextField label="Family name" value={name} onChangeText={setName} max={LIMITS.familyName} required check={check} showCheck={tried} testID="family-name" />
       {error ? <T variant="smallStrong" color="sindoor">{error}</T> : null}
-      {!again ? (
+      {!account ? (
+        <Card style={styles.invite}>
+          <T variant="bodyStrong">On this phone only</T>
+          <T variant="small" color="ink2">
+            Your papers stay on this phone, locked, and never reach our server. You can back them up to the cloud later from Settings.
+          </T>
+        </Card>
+      ) : !again ? (
         <Card style={styles.invite}>
           <T variant="bodyStrong">Were you invited?</T>
           <T variant="small" color="ink2">
-            Then you do not need a new family. Open the invite link they sent you, signed in as {account.email}.
+            Then you do not need a new family. Open the invite link they sent you, signed in as {account?.email}.
           </T>
         </Card>
       ) : null}

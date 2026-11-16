@@ -1,0 +1,31 @@
+{
+  "profile": "e-riya", "fresh": true, "noWebShare": true,
+  "steps": [
+    ["goUrl", "{{riyaInvite}}", 6000],
+    ["waitFor", "You are invited to a family on Almari", 10000],
+    ["tap", "join-sign-up"],
+    ["waitFor", "Create your account", 10000],
+    ["type", "name", "Riya Khurana"], ["type", "email", "{{riyaEmail}}"], ["type", "password", "{{pass}}"],
+    ["tap", "create-account"],
+    ["waitFor", "Check your email", 15000],
+    ["mailLink", "{{riyaEmail}}"],
+    ["waitFor", "Join Khurana's", 30000],
+    ["tap", "join-accept"],
+    ["waitFor", "Set your app PIN", 30000],
+    ["tap", "set-pin-2"], ["tap", "set-pin-4"], ["tap", "set-pin-6"], ["tap", "set-pin-9"],
+    ["waitFor", "Enter it once more", 5000],
+    ["tap", "set-pin-2"], ["tap", "set-pin-4"], ["tap", "set-pin-6"], ["tap", "set-pin-9"],
+    ["waitFor", "Your PIN is set.", 5000],
+    ["tap", "open-family"],
+    ["waitFor", "Namaste, Riya", 15000],
+    ["go", "/search", 4000],
+    ["tap", "lock-pin-2"], ["tap", "lock-pin-4"], ["tap", "lock-pin-6"], ["tap", "lock-pin-9"],
+    ["wait", 1500],
+    ["type", "search-input", "pan"],
+    ["waitFor", "PAN", 10000],
+    ["eval", "(() => { const el = [...document.querySelectorAll('[role=\"button\"]')].find(e => /PAN card/.test(e.getAttribute('aria-label') || e.textContent)); if (!el) return 'MISSING PAN row'; el.click(); return 'ok'; })()"],
+    ["wait", 5000],
+    ["eval", "(() => { const imgs = [...document.querySelectorAll('img')].filter(i => i.src.startsWith('blob:') && i.naturalWidth > 0); return imgs.length ? 'opened ' + imgs.length + ' image(s), first ' + imgs[0].naturalWidth + 'px wide' : 'EXPECTED a decrypted image'; })()"],
+    ["expect", "ABCPE1234F"]
+  ]
+}
