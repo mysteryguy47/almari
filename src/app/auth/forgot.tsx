@@ -1,6 +1,6 @@
 import { useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { StyleSheet } from 'react-native';
+import { Platform, StyleSheet } from 'react-native';
 
 import { Button } from '@/components/Button';
 import { TextField } from '@/components/Fields';
@@ -34,7 +34,7 @@ export default function Forgot() {
         <Card style={styles.card}>
           {/* Same words whether or not the account exists, so nobody can probe for accounts. */}
           <T variant="body">If an account uses this email, a reset link is on its way.</T>
-          <T variant="small" color="ink2">Open it on this device. Resetting also lifts a pause after wrong passwords. Your family’s papers are not affected: they are locked with keys on your devices, not your password.</T>
+          <T variant="small" color="ink2">{Platform.OS === 'web' ? 'Open it on this device.' : 'Open it on this phone.'} Resetting also lifts a pause after wrong passwords. Your family’s papers are not affected: they are locked with keys on your devices, not your password.</T>
           <Button label="Send again" variant="secondary" size="md" onPress={send} loading={busy} testID="send-reset" />
         </Card>
       ) : (

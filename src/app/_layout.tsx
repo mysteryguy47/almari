@@ -1,3 +1,6 @@
+// Must come first: fills in what Android's JavaScript engine lacks (no-op on the web).
+import '@/lib/polyfills';
+
 import { AnekLatin_400Regular, AnekLatin_500Medium, AnekLatin_600SemiBold, AnekLatin_700Bold } from '@expo-google-fonts/anek-latin';
 import { Eczar_600SemiBold, Eczar_700Bold } from '@expo-google-fonts/eczar';
 import { useFonts } from 'expo-font';
@@ -10,7 +13,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { DeviceRequestsHost } from '@/components/DeviceRequests';
-import { AppLock, ReauthHost } from '@/components/Security';
+import { AppLock, BehindLock, ReauthHost } from '@/components/Security';
 import { ToastHost } from '@/components/Toast';
 import { useApp } from '@/store/app-store';
 import { requestPersistentStorage } from '@/store/idb';
@@ -57,7 +60,9 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <ThemeProvider>
-          <ThemedStack />
+          <BehindLock>
+            <ThemedStack />
+          </BehindLock>
           <AppLock />
           <ReauthHost />
           <DeviceRequestsHost />

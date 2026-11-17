@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Platform, StyleSheet, View } from 'react-native';
 
 import { GoogleButton, NotConnected } from '@/components/AuthBits';
 import { Button } from '@/components/Button';
@@ -46,7 +46,11 @@ export default function SignUp() {
       <Screen title="Check your email" testID="check-email">
         <Card style={styles.card}>
           <T variant="body">We sent a link to <T variant="bodyStrong">{sentTo}</T>.</T>
-          <T variant="small" color="ink2">Open it on this device to finish. It can take a minute; check Spam or Promotions too.</T>
+          <T variant="small" color="ink2">
+            {Platform.OS === 'web'
+              ? 'Open it on this device to finish. It can take a minute; check Spam or Promotions too.'
+              : 'Open the link to confirm your email, on this phone or any other, then come back here and sign in. It can take a minute; check Spam or Promotions too.'}
+          </T>
           <T variant="small" color="ink2">If this email already has an account, sign in instead.</T>
         </Card>
         <Button

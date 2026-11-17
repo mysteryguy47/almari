@@ -4,7 +4,7 @@
  */
 import * as LocalAuthentication from 'expo-local-authentication';
 import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { AppState, Platform, Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -60,6 +60,29 @@ function usePinCheck(onOk: () => void) {
 }
 
 /** Covers the app until the PIN or fingerprint; re-locks after a minute in the background. */
+/** Whether the PIN screen is covering the app right now. */
+export function useAppLockShowing(): boolean {
+  const ctx = useCtx();
+  const pinSet = useApp((s) => !!s.device.pinHash);
+  const lockedOut = useApp((s) => !!s.device.lockedOut);
+  const locked = useUi((s) => s.locked);
+  return !!ctx && pinSet && !ctx.family.isSample && !lockedOut && locked;
+}
+
+/**
+ * The screens under the PIN screen. While it shows, they are hidden from
+ * screen readers and from Android accessibility services, which could
+ * otherwise read the family's papers through the lock.
+ */
+export function BehindLock({ children }: { children: ReactNode }) {
+  const hidden = useAppLockShowing();
+  return (
+    <View style={styles.behind} importantForAccessibility={hidden ? 'no-hide-descendants' : 'auto'} aria-hidden={hidden || undefined}>
+      {children}
+    </View>
+  );
+}
+
 export function AppLock() {
   const ctx = useCtx();
   const pinSet = useApp((s) => !!s.device.pinHash);
@@ -157,6 +180,7 @@ export function ReauthHost() {
 }
 
 const styles = StyleSheet.create({
+  behind: { flex: 1 },
   lock: { alignItems: 'center', justifyContent: 'space-between', zIndex: 100 },
   lockHead: { gap: space.sm, paddingHorizontal: space.xxl },
 });

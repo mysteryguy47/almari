@@ -3,7 +3,9 @@
  * afterwards. Screens call these; none of them touch Supabase directly.
  */
 import type { User } from '@supabase/supabase-js';
+import * as Linking from 'expo-linking';
 import type { Href } from 'expo-router';
+import * as WebBrowser from 'expo-web-browser';
 import { Platform } from 'react-native';
 
 import { attemptsLeft } from '@/domain/family-rules';
@@ -14,14 +16,24 @@ import { flushSaves } from '@/store/persist-storage';
 import { toast, useUi } from '@/store/ui-store';
 
 import { CloudError } from './api';
+import { setGoogleSignInPending } from './oauth-flag';
 import { api, deviceReady, setRevokedHandler, stopRealtime, supabase, syncNow } from './runtime';
 import type { CloudState } from './types';
 import { checkDevice, setUpNewAccount, type DeviceState } from './vault';
 
+const SITE_URL = (process.env.EXPO_PUBLIC_SITE_URL || 'https://almari.blackmonkey.in').replace(/\/+$/, '');
+
+/**
+ * Where links in emails and invites point. On a phone this is the web
+ * address, not the app: a link has to work on whatever device it is opened on.
+ */
 export function appOrigin(): string {
   if (Platform.OS === 'web' && typeof window !== 'undefined') return window.location.origin;
-  return 'almari://';
+  return SITE_URL;
 }
+
+/** Where Google sends a phone back to: the app itself. Allowed in Supabase as almari://** */
+export const NATIVE_REDIRECT = 'almari://auth/callback';
 
 function friendly(error: { message?: string; code?: string; status?: number } | null | undefined): string {
   const code = error?.code ?? '';
@@ -67,8 +79,20 @@ export const useDeviceSetup = (() => {
   return { get: () => last, set: (s: DeviceState | null) => (last = s) };
 })();
 
-/** Sets up the cloud state for whoever just signed in, and this device's keys. */
-export async function afterSignIn(): Promise<void> {
+let settingUp: Promise<void> | null = null;
+
+/**
+ * Sets up the cloud state for whoever just signed in, and this device's keys.
+ * Calls that overlap share one run, so a new account never gets two sets of keys.
+ */
+export function afterSignIn(): Promise<void> {
+  settingUp ??= setUpAfterSignIn().finally(() => {
+    settingUp = null;
+  });
+  return settingUp;
+}
+
+async function setUpAfterSignIn(): Promise<void> {
   const { data } = await supabase().auth.getUser();
   const user = data.user;
   if (!user) throw new CloudError('The sign-in did not finish. Try again.');
@@ -175,16 +199,51 @@ export async function signIn(email: string, password: string): Promise<SignInOut
   return { status: 'ok' };
 }
 
-export async function signInWithGoogle(): Promise<string | null> {
-  const { error } = await supabase().auth.signInWithOAuth({
+export type GoogleOutcome =
+  | { status: 'redirecting' } // the web page is on its way to Google
+  | { status: 'signed-in' } // a phone came back signed in
+  | { status: 'cancelled' }
+  | { status: 'error'; message: string };
+
+const firstParam = (v: unknown): string | undefined => (typeof v === 'string' ? v : Array.isArray(v) ? firstParam(v[0]) : undefined);
+
+/**
+ * On the web the page goes to Google and comes back to /auth/callback. On a
+ * phone Google opens in an in-app browser and returns to almari://auth/callback,
+ * and the sign-in finishes here, without an Android client ID or SHA-1 key.
+ */
+export async function signInWithGoogle(): Promise<GoogleOutcome> {
+  const queryParams = { prompt: 'select_account' };
+  if (Platform.OS === 'web') {
+    const { error } = await supabase().auth.signInWithOAuth({ provider: 'google', options: { redirectTo: `${appOrigin()}/auth/callback`, queryParams } });
+    return error ? { status: 'error', message: friendly(error) } : { status: 'redirecting' };
+  }
+  const { data, error } = await supabase().auth.signInWithOAuth({
     provider: 'google',
-    options: { redirectTo: `${appOrigin()}/auth/callback`, queryParams: { prompt: 'select_account' } },
+    options: { redirectTo: NATIVE_REDIRECT, skipBrowserRedirect: true, queryParams },
   });
-  return error ? friendly(error) : null;
+  if (error || !data?.url) return { status: 'error', message: friendly(error) };
+  setGoogleSignInPending(true);
+  try {
+    const result = await WebBrowser.openAuthSessionAsync(data.url, NATIVE_REDIRECT);
+    if (result.type !== 'success') return { status: 'cancelled' };
+    const { queryParams: back } = Linking.parse(result.url);
+    const done = await finishRedirect({ code: firstParam(back?.code), error_description: firstParam(back?.error_description) });
+    if (done.status === 'error') return { status: 'error', message: done.confirmed ? 'The sign-in did not finish. Try again.' : done.message };
+    await afterSignIn();
+    return { status: 'signed-in' };
+  } catch (e) {
+    return { status: 'error', message: friendly(e as Error) };
+  } finally {
+    setGoogleSignInPending(false);
+  }
 }
 
 export async function sendPasswordReset(email: string): Promise<string | null> {
-  const { error } = await supabase().auth.resetPasswordForEmail(normaliseEmail(email), { redirectTo: `${appOrigin()}/auth/reset` });
+  // On a phone the link comes back into the app, which holds this request's one-time secret (PKCE).
+  // With the token-hash email templates (docs/DEPLOY.md, step D) it opens the website instead, on any device.
+  const redirectTo = Platform.OS === 'web' ? `${appOrigin()}/auth/reset` : 'almari://auth/reset';
+  const { error } = await supabase().auth.resetPasswordForEmail(normaliseEmail(email), { redirectTo });
   // A rate limit is worth saying; anything about the account itself is not (no probing for accounts).
   if (error && (error.status === 429 || /rate limit|network|fetch/i.test(error.message))) return friendly(error);
   return null;
@@ -249,9 +308,25 @@ export async function changePassword(next: string, current?: string): Promise<st
 
 // ---------------------------------------------------------------- signing out
 
+let signingOut: Promise<void> | null = null;
+
 /** Signs out and removes everything Almari keeps on this device. The family's copy on the server is untouched. */
-export async function signOutAndForget(): Promise<void> {
+export function signOutAndForget(): Promise<void> {
+  // One at a time: retiring this device can make a sync notice it was removed and ask again.
+  signingOut ??= forgetThisDevice().finally(() => {
+    signingOut = null;
+  });
+  return signingOut;
+}
+
+async function forgetThisDevice(): Promise<void> {
   stopRealtime();
+  // This device's keys are about to be wiped, so it can no longer approve anyone: take it off
+  // the account's device list. Best effort, and never long enough to hold up signing out offline.
+  if (useApp.getState().cloud && deviceReady()) {
+    const retire = api().revokeDevice(useApp.getState().device.deviceId).catch(() => undefined);
+    await Promise.race([retire, new Promise((r) => setTimeout(r, 4000))]);
+  }
   await supabase().auth.signOut({ scope: 'local' }).catch(() => undefined);
   useApp.getState().clearLocal();
   useUi.getState().lock();

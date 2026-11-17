@@ -1,8 +1,9 @@
 /** Pieces the sign-in screens share. */
+import { router } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet } from 'react-native';
 
-import { signInWithGoogle } from '@/sync/account';
+import { nextRoute, signInWithGoogle } from '@/sync/account';
 import { cloudConfigured } from '@/sync/runtime';
 import { space } from '@/theme/tokens';
 
@@ -23,8 +24,12 @@ export function GoogleButton() {
         testID="google"
         onPress={async () => {
           setBusy(true);
-          setError(await signInWithGoogle());
+          setError(null);
+          const result = await signInWithGoogle();
+          if (result.status === 'redirecting') return; // the page is leaving for Google
           setBusy(false);
+          if (result.status === 'signed-in') router.replace(nextRoute());
+          else if (result.status === 'error') setError(result.message);
         }}
       />
       {error ? <T variant="smallStrong" color="sindoor" style={styles.error}>{error}</T> : null}

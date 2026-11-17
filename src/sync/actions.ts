@@ -58,7 +58,7 @@ export async function createFamily(name: string, you: Pick<Member, 'fullName' | 
     if (!canJoinAnotherFamily({ familyIds: Object.keys(cloud.memberships) })) {
       return fail('You can be in up to 3 families. Leave one to start another.');
     }
-    const familyId = crypto.randomUUID();
+    const familyId = newId();
     const memberId = newId();
     const familyKey = randomKey();
     await api().createFamily(familyId, memberId, seal(familyKey, myPublicKey()));

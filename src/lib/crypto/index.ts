@@ -11,9 +11,8 @@
  */
 import { entropyToMnemonic, mnemonicToEntropy, validateMnemonic } from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english.js';
-import sodiumModule from 'libsodium-wrappers';
-
-type Sodium = typeof sodiumModule;
+import sodiumModule from './sodium';
+import type { Sodium } from './sodium-type';
 
 let sodium: Sodium | null = null;
 let loading: Promise<void> | null = null;
@@ -21,8 +20,6 @@ let loading: Promise<void> | null = null;
 export function initCrypto(): Promise<void> {
   if (sodium) return Promise.resolve();
   if (!loading) {
-    // The default export is the whole library, `ready` included.
-    // eslint-disable-next-line import/no-named-as-default-member
     loading = sodiumModule.ready.then(() => {
       sodium = sodiumModule;
     });
@@ -46,8 +43,40 @@ export class CryptoError extends Error {
 }
 
 const BOX_PREFIX = '1.';
-const enc = new TextEncoder();
-const dec = new TextDecoder();
+
+// UTF-8, with a fallback for JavaScript engines without TextEncoder/TextDecoder.
+const enc = typeof TextEncoder !== 'undefined' ? new TextEncoder() : null;
+const dec = typeof TextDecoder !== 'undefined' ? new TextDecoder() : null;
+
+function encodeUtf8(text: string): Uint8Array {
+  if (enc) return enc.encode(text);
+  const out: number[] = [];
+  for (const ch of text) {
+    let c = ch.codePointAt(0) as number;
+    if (c < 0x80) out.push(c);
+    else if (c < 0x800) out.push(0xc0 | (c >> 6), 0x80 | (c & 63));
+    else if (c < 0x10000) out.push(0xe0 | (c >> 12), 0x80 | ((c >> 6) & 63), 0x80 | (c & 63));
+    else {
+      out.push(0xf0 | (c >> 18), 0x80 | ((c >> 12) & 63), 0x80 | ((c >> 6) & 63), 0x80 | (c & 63));
+    }
+  }
+  return new Uint8Array(out);
+}
+
+function decodeUtf8(bytes: Uint8Array): string {
+  if (dec) return dec.decode(bytes);
+  let out = '';
+  for (let i = 0; i < bytes.length; ) {
+    const b = bytes[i];
+    let c: number;
+    if (b < 0x80) { c = b; i += 1; }
+    else if (b < 0xe0) { c = ((b & 31) << 6) | (bytes[i + 1] & 63); i += 2; }
+    else if (b < 0xf0) { c = ((b & 15) << 12) | ((bytes[i + 1] & 63) << 6) | (bytes[i + 2] & 63); i += 3; }
+    else { c = ((b & 7) << 18) | ((bytes[i + 1] & 63) << 12) | ((bytes[i + 2] & 63) << 6) | (bytes[i + 3] & 63); i += 4; }
+    out += String.fromCodePoint(c);
+  }
+  return out;
+}
 
 export const KEY_BYTES = 32;
 
@@ -64,11 +93,11 @@ export function fromB64(text: string): Uint8Array {
 }
 
 export function utf8(text: string): Uint8Array {
-  return enc.encode(text);
+  return encodeUtf8(text);
 }
 
 export function fromUtf8(bytes: Uint8Array): string {
-  return dec.decode(bytes);
+  return decodeUtf8(bytes);
 }
 
 export function randomBytes(length: number): Uint8Array {
@@ -81,7 +110,10 @@ export function randomKey(): Uint8Array {
 
 /** Overwrites key material that is no longer needed. */
 export function wipe(bytes: Uint8Array | undefined | null): void {
-  if (bytes) s().memzero(bytes);
+  if (!bytes) return;
+  const so = s();
+  if (so.memzero) so.memzero(bytes);
+  else bytes.fill(0);
 }
 
 // ---------------------------------------------------------------- symmetric boxes
@@ -94,7 +126,7 @@ function unbox(box: string): Uint8Array {
 export function encryptBytes(plain: Uint8Array, key: Uint8Array, context: string): string {
   const so = s();
   const nonce = so.randombytes_buf(so.crypto_aead_xchacha20poly1305_ietf_NPUBBYTES);
-  const cipher = so.crypto_aead_xchacha20poly1305_ietf_encrypt(plain, utf8(context), null, nonce, key);
+  const cipher = so.crypto_aead_xchacha20poly1305_ietf_encrypt(plain, context, null, nonce, key);
   const out = new Uint8Array(nonce.length + cipher.length);
   out.set(nonce);
   out.set(cipher, nonce.length);
@@ -107,7 +139,7 @@ export function decryptBytes(box: string, key: Uint8Array, context: string): Uin
   const n = so.crypto_aead_xchacha20poly1305_ietf_NPUBBYTES;
   if (raw.length <= n) throw new CryptoError('This data is damaged');
   try {
-    return so.crypto_aead_xchacha20poly1305_ietf_decrypt(null, raw.subarray(n), utf8(context), raw.subarray(0, n), key);
+    return so.crypto_aead_xchacha20poly1305_ietf_decrypt(null, raw.subarray(n), context, raw.subarray(0, n), key);
   } catch {
     throw new CryptoError('This data could not be unlocked with this key');
   }
@@ -125,7 +157,7 @@ export function decryptJson<T>(box: string, key: Uint8Array, context: string): T
 export function encryptFile(plain: Uint8Array, key: Uint8Array, context: string): Uint8Array {
   const so = s();
   const nonce = so.randombytes_buf(so.crypto_aead_xchacha20poly1305_ietf_NPUBBYTES);
-  const cipher = so.crypto_aead_xchacha20poly1305_ietf_encrypt(plain, utf8(context), null, nonce, key);
+  const cipher = so.crypto_aead_xchacha20poly1305_ietf_encrypt(plain, context, null, nonce, key);
   const out = new Uint8Array(nonce.length + cipher.length);
   out.set(nonce);
   out.set(cipher, nonce.length);
@@ -137,7 +169,7 @@ export function decryptFile(data: Uint8Array, key: Uint8Array, context: string):
   const n = so.crypto_aead_xchacha20poly1305_ietf_NPUBBYTES;
   if (data.length <= n) throw new CryptoError('This file is damaged');
   try {
-    return so.crypto_aead_xchacha20poly1305_ietf_decrypt(null, data.subarray(n), utf8(context), data.subarray(0, n), key);
+    return so.crypto_aead_xchacha20poly1305_ietf_decrypt(null, data.subarray(n), context, data.subarray(0, n), key);
   } catch {
     throw new CryptoError('This file could not be unlocked');
   }

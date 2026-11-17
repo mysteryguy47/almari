@@ -8,7 +8,7 @@ The app (screens and rules) runs on the phone or in the browser and keeps everyt
 | --- | --- | --- |
 | Web app (iPhone, desktop, anyone with a link) | **Vercel**, from this GitHub repo | Hobby is free but for non-commercial use only. Move to Pro before charging money. |
 | Backend | **Supabase**, region South Asia (Mumbai) | Free while building (free projects pause after a week without use). Pro for launch. |
-| Android app | **EAS Build** makes it, **Play Console** ships it | EAS free tier is enough to start. You already have the Play account. |
+| Android app | **EAS Build** makes it, **Play Console** ships it ([ANDROID.md](ANDROID.md)) | EAS free tier is enough to start. You already have the Play account. |
 | iPhone | The Vercel web app, added to the Home Screen | Free. No Apple account needed. |
 
 ## 1. Web app on Vercel (about 10 minutes)
@@ -75,41 +75,7 @@ Then create `.env.local` from `.env.local.example` with the URL and publishable 
 
 ## 3. Android app (EAS Build, then Play Console)
 
-You need a free Expo account (expo.dev). Run these in this folder:
-
-```bash
-npx eas-cli@latest login
-```
-
-```bash
-npx eas-cli@latest init
-```
-
-```bash
-npx eas-cli@latest build:configure
-```
-
-`init` links the project to your Expo account and writes its id into `app.json`. `build:configure` writes `eas.json` with `development`, `preview` and `production` profiles.
-
-```bash
-npx eas-cli@latest build -p android --profile development
-```
-
-A development build installs like a normal app and can run native modules that Expo Go cannot: Google sign-in, ML Kit text reading, the document scanner. When EAS asks to create an Android keystore, say yes; EAS keeps it safe for you.
-
-```bash
-npx eas-cli@latest build -p android --profile production
-```
-
-This makes the `.aab` for Play. In Play Console:
-
-1. **Create app**: Almari, App, Free (subscriptions are sold inside a free app).
-2. Fill in the setup list: privacy policy URL, app access (give reviewers a test login), ads (none), content rating, target audience (adults), data safety.
-3. **Testing → Internal testing → Create release**, upload the `.aab`, add testers' emails, share the opt-in link.
-4. Play App Signing is on by default. After this first upload, the app-signing key's SHA-1 appears under **App integrity**. Google sign-in needs it (see the Google guide).
-5. If your Play developer account is a *personal* account, Google requires a closed test with at least 12 testers for 14 days before the app can go to production. An organisation account does not have this rule.
-
-Later uploads can go through `npx eas-cli@latest submit -p android` once a Play service-account key is set up. The very first upload has to be done by hand in Play Console.
+Step by step in [ANDROID.md](ANDROID.md): the Supabase redirect for the app, EAS login and server settings, a test APK for your own phone, the Play build, the Play Console forms (privacy policy, data safety, account deletion), internal testing, and the closed test Google needs before production.
 
 ## 4. iPhone
 
@@ -119,4 +85,4 @@ iPhone users use the web app. On a real iPhone:
 2. **Share → Add to Home Screen**. It opens full screen with the Almari icon.
 3. Check: it opens in flight mode after the first visit, the camera and photo picker work, a pack PDF and a resized photo open the share sheet, the masked copy saves, dark mode follows the phone, and the data is still there after closing the app.
 
-Until sync is built, data lives only on that phone. Use the sample family or test papers, never real ones.
+Signed in, the family syncs with Android phones and other browsers. A family kept *on this phone only* stays in that Safari's storage, so Safari must not be set to clear website data.

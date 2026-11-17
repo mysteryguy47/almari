@@ -1,6 +1,6 @@
 /** Sending an invite link: WhatsApp first (that is how families talk), then the share sheet or a copy. */
 import * as Linking from 'expo-linking';
-import { Platform, StyleSheet, View } from 'react-native';
+import { Platform, Share, StyleSheet, View } from 'react-native';
 
 import { copyText } from '@/lib/device';
 import { toast } from '@/store/ui-store';
@@ -16,7 +16,10 @@ export function inviteMessage(name: string, familyName: string, link: string): s
 }
 
 export function InviteActions({ link, message }: { link: string; message: string }) {
-  const canShare = Platform.OS === 'web' && typeof navigator !== 'undefined' && !!navigator.share;
+  const webShare = Platform.OS === 'web' && typeof navigator !== 'undefined' && !!navigator.share;
+  const canShare = Platform.OS !== 'web' || webShare;
+  const share = () =>
+    webShare ? navigator.share({ text: message }).catch(() => undefined) : Share.share({ message }).catch(() => undefined);
   return (
     <View style={styles.actions}>
       <Button label="Send on WhatsApp" icon="MessageCircle" onPress={() => Linking.openURL(`https://wa.me/?text=${encodeURIComponent(message)}`)} testID="invite-whatsapp" />
@@ -25,7 +28,7 @@ export function InviteActions({ link, message }: { link: string; message: string
           label="Share another way"
           variant="secondary"
           icon="Share2"
-          onPress={() => navigator.share({ text: message }).catch(() => undefined)}
+          onPress={share}
           testID="invite-share"
         />
       ) : null}

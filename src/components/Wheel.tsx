@@ -110,6 +110,8 @@ export function WheelColumn<V extends string | number>({
         showsVerticalScrollIndicator={false}
         snapToInterval={ITEM}
         decelerationRate="fast"
+        // Android: without this the page's own scroll takes the swipe and the wheel never turns.
+        nestedScrollEnabled
         contentOffset={{ x: 0, y: index * ITEM }}
         onLayout={() => {
           if (!placed.current) requestAnimationFrame(place);

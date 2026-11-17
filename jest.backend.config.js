@@ -7,7 +7,7 @@ module.exports = {
   testMatch: ['<rootDir>/tests/backend/**/*.test.ts'],
   transform: { '^.+\\.[jt]sx?$': ['babel-jest', { presets: ['babel-preset-expo'] }] },
   transformIgnorePatterns: ['node_modules/(?!(@scure|@noble)/)'],
-  moduleNameMapper: { '^@/(.*)$': '<rootDir>/src/$1' },
+  moduleNameMapper: { '^@/(.*)$': '<rootDir>/src/$1', '^react-native-libsodium$': 'libsodium-wrappers', '^react-native$': '<rootDir>/tests/backend/react-native-stub.js' },
   testTimeout: 60000,
   maxWorkers: 1,
 };

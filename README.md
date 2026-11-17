@@ -16,7 +16,7 @@ cp .env.local.example .env.local   # then paste the URL and publishable key from
 npx expo start --web          # the web app (what iPhone users install from Safari)
 ```
 
-Sign-up and reset emails land in the local mailbox at http://127.0.0.1:54324. The Android app has not been run against the backend yet. libsodium needs WebAssembly, which Android's JavaScript engine lacks, so expect to switch to `react-native-libsodium` in a development build; see docs/DEPLOY.md.
+Sign-up and reset emails land in the local mailbox at http://127.0.0.1:54324. For the Android app, `npx expo run:android` builds and installs a development build on the emulator; [docs/ANDROID.md](docs/ANDROID.md) has that and every step to Play Store testing.
 
 To try it without signing up, open the web app and tap **Explore a sample family** (the Sharmas). Under the family nameplate, **Viewing as** shows the app through Papa's or Mummy's eyes, which is how to check privacy and reminders.
 
@@ -39,9 +39,9 @@ npx expo export -p web   # production web build in dist/ (installable, works off
 | --- | --- |
 | `src/domain` | Every rule, as pure TypeScript with no React: the data model, who can see what, who is reminded and when, the 121 templates, validation (Verhoeff for Aadhaar, Luhn for cards, PAN, IFSC), search with Hinglish synonyms, the sample family. Most tests are here. |
 | `src/lib` | Device-specific work with a web and a native version side by side: image resizing and masking (`image-ops`), reading text from a photo (`ocr`), turning saved files into PDF pages. |
-| `src/lib/crypto` | All the cryptography (libsodium): boxes bound to what they belong to, sealed keys, the six comparison symbols, the Recovery Kit's 24 words. |
+| `src/lib/crypto` | All the cryptography (libsodium: WebAssembly on the web, native on Android, the same bytes on both): boxes bound to what they belong to, sealed keys, the six comparison symbols, the Recovery Kit's 24 words. |
 | `src/sync` | The cloud: Supabase calls (`api`), family ↔ records (`model`), merging two edits (`merge`), the sync engine, device set-up and recovery (`vault`), sign-in (`account`), invites and removals (`actions`), and the runtime that keeps it all in sync. |
-| `src/store` | App state (Zustand + Immer), saved shortly after every change. On the web it is IndexedDB, encrypted with a non-extractable device key; files are stored encrypted with their own keys. On Android, files written one at a time and atomically (encryption at rest there comes with the Android build). |
+| `src/store` | App state (Zustand + Immer), saved shortly after every change, encrypted with a device key: on the web a non-extractable browser key (IndexedDB), on Android a key in the Android Keystore. Files are stored encrypted with their own keys. |
 | `supabase` | The database: tables, access rules and server functions in one migration, and the local configuration. |
 | `tests/backend` | Tests that run against the local Supabase with real accounts. |
 | `src/theme` | Colours (light and dark, every text pair checked for WCAG AA contrast by a test), spacing, fonts (Anek Latin, Eczar). |
@@ -65,20 +65,21 @@ npx expo export -p web   # production web build in dist/ (installable, works off
 
 ## What works, and what is still to come
 
-| Works on the web | Still to come |
+| Works (web and Android) | Still to come |
 | --- | --- |
-| Accounts: email and password with confirmation, Google, reset by email, a Google user adding a password, five-try pause, deleting the account | Android app (development build with native encryption, Google sign-in, ML Kit) |
+| Accounts: email and password with confirmation, Google, reset by email, a Google user adding a password, five-try pause, deleting the account | Android: reading numbers and the Recovery Kit QR from a photo (ML Kit), invite links opening the app (App Links) |
 | End-to-end encryption of every record and file; private items sealed for one person; the server sees only locked boxes | Phone notifications and iPhone web push |
 | Sync between family phones: offline first, merging two people's edits, live updates, a removed device wiped at its next connection | Email sending from your own domain (SMTP) for family testers |
 | Families, invites by link (WhatsApp, copy, QR) or by email, joining, leaving, removals approved by a second member, up to 3 families | Family key rotation after someone leaves (Phase 2) |
 | New devices: approval from your own device or a family member's with six matching symbols, the printed Recovery Kit (words or QR photo), starting fresh | Hindi and other languages; export as readable folders |
-| Everything from the prototype and Phase 2: 121 templates, locker, to-do, reminders, packs, print sheet, form export, masked Aadhaar, nudges, money map | Independent security audit; account deletion on a web page |
+| Everything from the prototype and Phase 2: 121 templates, locker, to-do, reminders, packs, print sheet, form export, masked Aadhaar, nudges, money map | Independent security audit |
 
 ## Verified
 
-- 202 unit tests and 38 backend tests (against a local Supabase with real accounts), type check and lint clean.
+- 211 unit tests and 38 backend tests (against a local Supabase with real accounts), type check and lint clean.
 - The backend in headless Chrome, two to five browser profiles playing family members, with real confirmation and reset emails: sign-up and first family; an invite link opened before signing up; joining by email without the link; a shared note and an encrypted PAN photo reaching the other member; an Only me note never reaching them; edits both ways; a live update within seconds; a note written offline syncing on reconnect; a new browser let in by Papa's other browser (six symbols matching) and by a family member (old phone then wiped, Only me items stayed locked); the Recovery Kit by typed words and by a photo of the printed PDF; five wrong passwords pausing sign-in, a reset link lifting it; five wrong PINs and signing in again with nothing lost; leaving a family; deleting an account; the Google button reaching Google with the right client. On the production build: sign-up with email confirmation, a family, an encrypted photo, sync, and opening offline. The server's tables hold no readable names, numbers or titles.
 - Scripted runs of the web app in headless Chrome at phone size: sign-up to first family, the sample family, privacy by viewer, real file uploads (size and type limits), lockouts and resets, card and bank forms, and the installed web app opening with no network.
 - Phase 2 in headless Chrome, on the dev server and on the production build: a nudge becoming a task, the money map's missing-nominee flags, a vehicle-check PDF (6 A4 pages, checked with pdf-lib), a print sheet, reading a licence and a test Aadhaar card, the masked copy, and a 200 × 230 px photo under 50 KB.
 - The Android app in the emulator through Expo Go: rendering, tabs, sheets, the card flip, and data surviving a force-close. Phase 2: the home nudge, a pack PDF built on the phone and handed to the share sheet, the form export (200 × 230 px, 28 KB) opening the share sheet, and a masked Aadhaar copy placed by hand and shared exactly as shown.
-- Not tested: a real iPhone or iOS Safari (this Mac has no Xcode or iOS Simulator), a physical Android phone, the Android app with the backend, real Google sign-in (needs your Google client), and your hosted Supabase project (needs the migration applied there).
+- The Android app (debug build on the emulator, Android 16) against the local Supabase, together with the web app: sign-up, email confirmation and sign-in on the phone; a new account's keys and a family created on the phone; the web browser let in by the phone (same six symbols on both) and opening the phone's family; a note written on the web read on the phone; a PAN photo added on the phone through the system photo picker, uploaded encrypted and opened on the web (1200 × 1500); the phone signed out (session, papers and file copies gone), reset its password through a link back into the app, and was let in again by the web; IFSC lookup; the date wheels; dark mode; the PIN lock after a restart. On the phone, the saved state and the sign-in token are encrypted at rest (no names, emails or tokens readable in the app's files). Google sign-in's return into the app was checked by sending the return link to the app; Google's own page was not, because the emulator's Chrome is not set up.
+- Not tested: a real iPhone or iOS Safari (this Mac has no Xcode or iOS Simulator), a physical Android phone, an EAS release build, real Google sign-in end to end, and your hosted Supabase project.

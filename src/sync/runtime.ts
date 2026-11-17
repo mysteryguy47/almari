@@ -10,6 +10,7 @@ import { create } from 'zustand';
 
 import { fromB64, initCrypto, keyPairFromMaster, openSealed, toB64, type KeyPair } from '@/lib/crypto';
 import { useApp } from '@/store/app-store';
+import { newId } from '@/store/secrets';
 import { cipherStore, setFileKeepPolicy, setFileRemote } from '@/store/files';
 import { kv } from '@/store/kv';
 import { flushSaves } from '@/store/persist-storage';
@@ -145,7 +146,14 @@ export function setRevokedHandler(fn: () => void) {
 }
 
 export function deviceName(): string {
-  if (Platform.OS !== 'web') return Platform.OS === 'android' ? 'Android phone' : 'Phone';
+  if (Platform.OS === 'android') {
+    // "Samsung SM-S918B" or "Google Pixel 8": enough to tell two phones apart in the device list.
+    const { Brand, Model } = Platform.constants as { Brand?: string; Model?: string };
+    const brand = Brand ? Brand[0].toUpperCase() + Brand.slice(1) : '';
+    const name = [brand, Model].filter(Boolean).join(' ').trim();
+    return name ? `${name} (Android)` : 'Android phone';
+  }
+  if (Platform.OS !== 'web') return 'Phone';
   const ua = typeof navigator === 'undefined' ? '' : navigator.userAgent;
   const browser = /Edg\//.test(ua) ? 'Edge' : /Firefox\//.test(ua) ? 'Firefox' : /Chrome\//.test(ua) ? 'Chrome' : /Safari\//.test(ua) ? 'Safari' : 'Browser';
   const os = /iPhone/.test(ua) ? 'iPhone' : /iPad/.test(ua) ? 'iPad' : /Android/.test(ua) ? 'Android' : /Mac OS X/.test(ua) ? 'Mac' : /Windows/.test(ua) ? 'Windows' : 'computer';
@@ -202,7 +210,7 @@ function claimMyMember(familyId: string) {
     m.accountId = d.cloud.userId;
     m.email = d.cloud.email;
     m.inviteLink = undefined;
-    d.families[familyId].activity.unshift({ id: crypto.randomUUID(), at: Date.now(), by: m.id, kind: 'member', text: 'joined the family' });
+    d.families[familyId].activity.unshift({ id: newId(), at: Date.now(), by: m.id, kind: 'member', text: 'joined the family' });
   });
 }
 
@@ -364,6 +372,11 @@ export function startCloud(): void {
   RNAppState.addEventListener('change', (state) => {
     if (state === 'active') requestSync(200);
     if (state === 'background') void flushSaves();
+    // On a phone the sign-in is refreshed only while the app is open (Supabase's advice for React Native).
+    if (Platform.OS !== 'web') {
+      if (state === 'active') supabase().auth.startAutoRefresh();
+      else supabase().auth.stopAutoRefresh();
+    }
   });
   if (Platform.OS === 'web' && typeof window !== 'undefined') {
     window.addEventListener('online', () => requestSync(200));

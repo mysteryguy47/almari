@@ -3,6 +3,7 @@ import {
   keyPairFromMaster, keySymbols, kitEntropy, kitKey, kitQrText, newKitWords, normaliseKitWords, openSealed, randomKey, seal,
   SYMBOLS, utf8,
 } from '../index';
+import sodiumLib from 'libsodium-wrappers';
 
 beforeAll(() => initCrypto());
 
@@ -108,5 +109,25 @@ describe('the Recovery Kit', () => {
     expect(entropyFromKitQr(kitQrText(entropy))).toEqual(entropy);
     expect(entropyFromKitQr('https://example.com')).toBeNull();
     expect(entropyFromKitQr('almari-kit:1:short')).toBeNull();
+  });
+});
+
+describe('the same bytes everywhere', () => {
+  it('opens boxes made with the context as UTF-8 bytes (how earlier versions made them)', async () => {
+    const lib = sodiumLib;
+    await lib.ready;
+    const key = randomKey();
+    const nonce = lib.randombytes_buf(24);
+    const context = 'rec:fam-1:doc-1:document';
+    const oldStyle = lib.crypto_aead_xchacha20poly1305_ietf_encrypt(utf8('पापा का PAN 👍'), utf8(context), null, nonce, key);
+    const box = `1.${lib.to_base64(new Uint8Array([...nonce, ...oldStyle]), lib.base64_variants.URLSAFE_NO_PADDING)}`;
+    expect(decryptBytes(box, key, context)).toEqual(utf8('पापा का PAN 👍'));
+  });
+
+  it('round-trips Hindi, emoji and accents through UTF-8', () => {
+    for (const text of ['पापा का आधार', 'Ñandú café', 'family 👨‍👩‍👧 ✅', '']) {
+      const key = randomKey();
+      expect(decryptJson(encryptJson({ text }, key, 'c'), key, 'c')).toEqual({ text });
+    }
   });
 });

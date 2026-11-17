@@ -3,6 +3,7 @@
  * errors turned into plain sentences. Nothing here knows about the store.
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { Platform } from 'react-native';
 
 export const FILES_BUCKET = 'family-files';
 
@@ -287,11 +288,13 @@ export class CloudApi {
 
   // ---------------------------------------------------------------- files (always encrypted bytes)
   async uploadFile(familyId: string, fileId: string, bytes: Uint8Array): Promise<void> {
-    const body = new Blob([bytes as BlobPart], { type: 'application/octet-stream' });
+    // Android's Blob cannot be made from bytes; an ArrayBuffer uploads the same.
+    const body = Platform.OS === 'web' ? new Blob([bytes as BlobPart], { type: 'application/octet-stream' }) : (bytes.slice().buffer as ArrayBuffer);
     await call(this.client.storage.from(FILES_BUCKET).upload(`${familyId}/${fileId}`, body, { contentType: 'application/octet-stream', upsert: true }));
   }
 
   async downloadFile(familyId: string, fileId: string): Promise<Uint8Array | null> {
+    if (Platform.OS !== 'web') return this.downloadNative(familyId, fileId);
     let result;
     try {
       result = await this.client.storage.from(FILES_BUCKET).download(`${familyId}/${fileId}`);
@@ -304,6 +307,29 @@ export class CloudApi {
       fail(result.error);
     }
     return new Uint8Array(await result.data.arrayBuffer());
+  }
+
+  /** Android: a short-lived signed link, read straight into bytes (its Blob has no arrayBuffer()). */
+  private async downloadNative(familyId: string, fileId: string): Promise<Uint8Array | null> {
+    let signed;
+    try {
+      signed = await this.client.storage.from(FILES_BUCKET).createSignedUrl(`${familyId}/${fileId}`, 120);
+    } catch (e) {
+      fail(e as { message?: string });
+    }
+    if (signed.error || !signed.data?.signedUrl) {
+      if (/not found/i.test(signed.error?.message ?? '')) return null;
+      fail(signed.error);
+    }
+    let response: Response;
+    try {
+      response = await fetch(signed.data.signedUrl);
+    } catch (e) {
+      fail(e as { message?: string });
+    }
+    if (response.status === 404 || response.status === 400) return null;
+    if (!response.ok) fail({ message: `Download failed (${response.status})` });
+    return new Uint8Array(await response.arrayBuffer());
   }
 
   async removeFiles(familyId: string, fileIds: string[]): Promise<void> {

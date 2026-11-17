@@ -77,6 +77,9 @@ export default function Welcome() {
           Almari is new and being tested with families. Everything is locked on your device before it is saved. Keep the paper originals safe as always.
         </T>
       </View>
+      <T variant="small" color="ink2" align="center" style={styles.policy} onPress={() => router.push('/privacy')} testID="welcome-privacy" accessibilityRole="link">
+        Privacy policy
+      </T>
     </Screen>
   );
 }
@@ -89,4 +92,5 @@ const styles = StyleSheet.create({
   promise: { flexDirection: 'row', alignItems: 'center', gap: space.md },
   actions: { gap: space.md, marginBottom: space.xxl },
   note: { flexDirection: 'row', alignItems: 'center', gap: space.md },
+  policy: { marginTop: space.xl, paddingVertical: space.sm, textDecorationLine: 'underline' },
 });
