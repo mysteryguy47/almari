@@ -11,12 +11,15 @@ import { checkEmail } from '@/domain/validation';
 import { useApp } from '@/store/app-store';
 import { toast } from '@/store/ui-store';
 import { nextRoute, resendConfirmation, signIn, signOutAndForget } from '@/sync/account';
+import { useSyncStatus } from '@/sync/runtime';
 import { space } from '@/theme/tokens';
 
 export default function SignIn() {
   const cloud = useApp((s) => s.cloud);
   const lockedOut = useApp((s) => !!s.device.lockedOut);
-  const again = !!cloud && lockedOut;
+  const signedOut = useSyncStatus((s) => s.state === 'signed-out');
+  // Signing in again as the same account: after five wrong PINs, or after the sign-in ended elsewhere.
+  const again = !!cloud && (lockedOut || signedOut);
   const [email, setEmail] = useState(again ? cloud.email : '');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);

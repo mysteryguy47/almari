@@ -60,7 +60,10 @@ export function api(): CloudApi {
 
 // ---------------------------------------------------------------- status for the screens
 
-export type SyncState = 'idle' | 'syncing' | 'offline' | 'error';
+/** signed-out: this device's sign-in ended on the server (a password change elsewhere, or it expired). The data stays. */
+export type SyncState = 'idle' | 'syncing' | 'offline' | 'error' | 'signed-out';
+
+class SessionGone extends Error {}
 
 export const useSyncStatus = create<{ state: SyncState; lastSyncedAt?: number; message?: string }>(() => ({ state: 'idle' }));
 
@@ -217,6 +220,12 @@ function claimMyMember(familyId: string) {
 async function round(): Promise<void> {
   const s0 = useApp.getState();
   if (!s0.cloud || !deviceReady()) return;
+  // Without a live sign-in every call is refused; say so instead of showing the server's words.
+  const { data: auth, error: authError } = await supabase().auth.getSession();
+  if (!auth.session) {
+    if (authError && /fetch|network/i.test(authError.message)) throw new CloudError('No internet', undefined, true);
+    throw new SessionGone();
+  }
   await initCrypto();
   const touch = await api().touchDevice(s0.device.deviceId, deviceName());
   if (touch.revoked) {
@@ -262,6 +271,7 @@ export function syncNow(): Promise<void> {
     again = true;
     return running;
   }
+  const wasSignedIn = useSyncStatus.getState().state !== 'signed-out';
   useSyncStatus.setState({ state: 'syncing' });
   running = (async () => {
     try {
@@ -271,6 +281,13 @@ export function syncNow(): Promise<void> {
       } while (again);
       useSyncStatus.setState({ state: 'idle', lastSyncedAt: Date.now(), message: undefined });
     } catch (e) {
+      if (e instanceof SessionGone) {
+        if (useSyncStatus.getState().state !== 'signed-out' && wasSignedIn) {
+          toast('Signed out on this device, perhaps after a password change. Sign in again to keep syncing; nothing here is lost.', { tone: 'warn' });
+        }
+        useSyncStatus.setState({ state: 'signed-out', message: undefined });
+        return;
+      }
       const offline = e instanceof CloudError && e.offline;
       useSyncStatus.setState({ state: offline ? 'offline' : 'error', message: (e as Error).message });
       if (!offline) console.warn('Sync failed', e);

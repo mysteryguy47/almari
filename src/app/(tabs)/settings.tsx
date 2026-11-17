@@ -59,7 +59,7 @@ export default function Settings() {
 
       <Section title="Family">
         <Card padded={false}>
-          <Row title={family.name} subtitle={`${family.members.length} members · personal papers ${family.personalSharing === 'private' ? 'private' : 'shared'}`} icon="House" tint="inland" onPress={() => router.push('/settings/family')} testID="settings-family" />
+          <Row title={family.name} subtitle={`${family.members.length} ${family.members.length === 1 ? 'member' : 'members'} · personal papers ${family.personalSharing === 'private' ? 'private' : 'shared'}`} icon="House" tint="inland" onPress={() => router.push('/settings/family')} testID="settings-family" />
           <Row title="Your families" subtitle="Switch, or start another (up to 3)" icon="Users" tint="almari" divider onPress={() => router.push('/settings/families')} />
           {!sample ? <Row title="Where papers are kept" subtitle={familyStorage} icon={family.storage === 'local' ? 'Smartphone' : 'Cloud'} tint="inland" divider onPress={() => router.push('/settings/storage')} testID="settings-storage" /> : null}
           <Row title="Reminders" subtitle="What you are told about, and when" icon="Bell" tint="haldi" divider onPress={() => router.push('/settings/reminders')} testID="settings-reminders" />

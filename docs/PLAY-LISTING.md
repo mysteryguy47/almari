@@ -20,6 +20,7 @@ LOCKED SO THAT EVEN WE CANNOT READ IT
 • Everything is encrypted on your phone before it is saved or sent.
 • The keys stay with your family's devices and your printed Recovery Kit. Our server only ever holds locked boxes.
 • Fingerprint or PIN lock, and sensitive numbers stay hidden until you unlock.
+• No screenshots or screen recordings, and Almari stays blank in your recent apps.
 
 YOU CHOOSE WHERE IT IS KEPT
 • On this phone only: no account, nothing ever reaches us. Almari works as an organiser on your phone.

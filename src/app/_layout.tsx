@@ -16,6 +16,7 @@ import { DeviceRequestsHost } from '@/components/DeviceRequests';
 import { AppLock, BehindLock, ReauthHost } from '@/components/Security';
 import { ToastHost } from '@/components/Toast';
 import { useApp } from '@/store/app-store';
+import { guardScreen } from '@/lib/screen-guard';
 import { requestPersistentStorage } from '@/store/idb';
 import { resumeSession } from '@/sync/account';
 import { cloudConfigured, startCloud } from '@/sync/runtime';
@@ -53,6 +54,8 @@ export default function RootLayout() {
   useEffect(() => {
     // On the web (the iPhone app), ask the browser to keep our storage.
     if (Platform.OS === 'web') requestPersistentStorage().catch(() => undefined);
+    // On Android, no screenshots, recordings or previews in the recent-apps view.
+    guardScreen();
   }, []);
 
   if (!ready) return null;

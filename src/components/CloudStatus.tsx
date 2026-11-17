@@ -46,13 +46,19 @@ export function SyncLine({ familyId }: { familyId: string }) {
   } else if (state === 'error') {
     icon = 'CloudOff';
     text = `Not synced: ${message ?? 'the server did not answer'}. Tap to retry.`;
+  } else if (state === 'signed-out') {
+    icon = 'CloudOff';
+    text = 'Signed out on this device, perhaps after a password change. Tap to sign in again; nothing here is lost.';
   } else {
     text = pending ? `${pending} change${pending > 1 ? 's' : ''} waiting to sync` : when ? `Synced ${ago(when)}, locked on the way` : 'Not synced yet';
   }
+  const problem = state === 'error' || state === 'signed-out';
+  const onPress =
+    state === 'signed-out' ? () => router.push('/auth/sign-in') : state === 'error' || state === 'offline' ? () => void syncNow() : undefined;
   return (
     <View style={styles.line} testID="sync-line">
-      <Icon name={icon} size={16} color={state === 'error' ? 'sindoor' : 'ink3'} />
-      <T variant="small" color={state === 'error' ? 'sindoor' : 'ink3'} style={styles.flex} onPress={state === 'error' || state === 'offline' ? () => void syncNow() : undefined}>
+      <Icon name={icon} size={16} color={problem ? 'sindoor' : 'ink3'} />
+      <T variant="small" color={problem ? 'sindoor' : 'ink3'} style={styles.flex} onPress={onPress} testID="sync-line-text">
         {text}
       </T>
     </View>

@@ -6,6 +6,7 @@ The Android app is the same code as the web app, built into a real app by **EAS 
 
 - **Encryption** runs natively (`react-native-libsodium`), byte for byte the same as the web app, so a family can mix Android phones and browsers.
 - **On the phone**, everything Almari saves is encrypted with a key held in the **Android Keystore** (`expo-secure-store`). Files are encrypted one by one in the app's private folder.
+- **No screenshots or screen recordings** of Almari, and it shows blank in the recent-apps view (Android's secure-window flag, `src/lib/screen-guard.ts`). Sharing a paper on purpose still works through Share. This needs the `DETECT_SCREEN_CAPTURE` permission on Android 14+, an ordinary one with no prompt; the photo-library permissions the same library would add are blocked in `app.json`.
 - **Google sign-in** opens Google's page in a secure in-app browser and comes back to the app at `almari://auth/callback`. No Android client ID or SHA-1 is needed.
 - **Email and invite links** point to the website (`EXPO_PUBLIC_SITE_URL`, default `https://almari.blackmonkey.in`), so they work on any device. Invite links open straight in the app once App Links are verified (step 10). Until then, an invited person can sign in on the phone and tap **Ask to join**.
 - **Not on Android yet:** reading numbers from a photo, and reading the Recovery Kit's QR from a photo (typing its 24 words works). Both arrive with Google ML Kit.
@@ -114,7 +115,7 @@ Then **Dashboard → Set up your app**. Answers that match the app today:
 
 - Short description, up to 80 characters, for example: *Your family's papers, IDs, passwords and bank details, locked in one place.*
 - Full description: what it keeps, end-to-end encryption, phone-only mode, the family, the Recovery Kit, and a line that it is not affiliated with the Government of India, UIDAI or any bank.
-- App icon 512 × 512 PNG, feature graphic 1024 × 500, and at least 2 phone screenshots. Category: **Productivity**. Contact email: the same as step 2.
+- App icon 512 × 512 PNG, feature graphic 1024 × 500, and at least 2 phone screenshots. The Android app blocks screenshots, so take these from the web app at phone size (Chrome → Inspect → device toolbar, 1080 × 2400) with the sample family; the screens are the same. Category: **Productivity**. Contact email: the same as step 2.
 
 ### 8. Internal testing (start testing today)
 

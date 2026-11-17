@@ -21,8 +21,10 @@ export function goBack() {
 
 export interface ScreenProps {
   title?: string;
-  /** A large serif title for top-level screens. */
+  /** A large serif title for top-level screens, in the fixed header; the subtitle then leads the page. */
   large?: boolean;
+  /** Shown in the fixed header in place of the title: the home screen's family nameplate. */
+  heading?: ReactNode;
   subtitle?: string;
   back?: boolean;
   right?: ReactNode;
@@ -40,19 +42,14 @@ export function useLift(): ViewStyle | null {
   return scheme === 'light' ? ({ boxShadow: '0 1px 2px rgba(51, 36, 15, 0.04), 0 6px 20px rgba(51, 36, 15, 0.05)' } as ViewStyle) : null;
 }
 
-export function Screen({ title, large, subtitle, back = true, right, children, footer, bottomInset = 0, scroll = true, testID }: ScreenProps) {
+export function Screen({ title, large, heading, subtitle, back = true, right, children, footer, bottomInset = 0, scroll = true, testID }: ScreenProps) {
   const { palette } = useTheme();
   const insets = useSafeAreaInsets();
   // Once the page scrolls, the header gets a hairline edge so it reads as sitting above the content.
   const [scrolled, setScrolled] = useState(false);
   const body = (
     <Animated.View entering={FadeIn.duration(240)} style={styles.column}>
-      {large && title ? (
-        <View style={styles.largeHeader}>
-          <T variant="display" accessibilityRole="header">{title}</T>
-          {subtitle ? <T variant="body" color="ink2">{subtitle}</T> : null}
-        </View>
-      ) : null}
+      {large && subtitle ? <T variant="body" color="ink2" style={styles.lead}>{subtitle}</T> : null}
       {children}
     </Animated.View>
   );
@@ -76,10 +73,8 @@ export function Screen({ title, large, subtitle, back = true, right, children, f
             </Pressable>
           ) : null}
           <View style={styles.headerTitle}>
-            {!large && title ? (
-              <T variant="heading" numberOfLines={1} accessibilityRole="header">{title}</T>
-            ) : null}
-            {!large && subtitle ? <T variant="small" color="ink2" numberOfLines={1}>{subtitle}</T> : null}
+            {heading ?? (title ? <T variant={large ? 'display' : 'heading'} numberOfLines={1} accessibilityRole="header">{title}</T> : null)}
+            {!large && !heading && subtitle ? <T variant="small" color="ink2" numberOfLines={1}>{subtitle}</T> : null}
           </View>
           {right}
         </View>
@@ -230,7 +225,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: { flex: 1 },
   back: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', borderWidth: StyleSheet.hairlineWidth },
-  largeHeader: { gap: 2, marginBottom: space.lg },
+  lead: { marginBottom: space.lg },
   footer: { borderTopWidth: StyleSheet.hairlineWidth, paddingTop: space.md },
   // Content stays inside the rounded corners; the soft shadow is drawn outside and is not clipped.
   card: { borderRadius: radius.lg, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },

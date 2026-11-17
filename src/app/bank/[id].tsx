@@ -134,8 +134,8 @@ export default function BankAccountScreen() {
   const ifscHelper =
     ifscInfo?.status === 'looking' ? 'Looking up the branch…'
       : ifscInfo?.status === 'found' ? ifscInfo.text
-        : ifscInfo?.status === 'unknown' ? 'No branch found for this IFSC. Check it, or type the branch under More details.'
-          : ifscInfo?.status === 'offline' ? 'Offline: type the branch under More details if you like.'
+        : ifscInfo?.status === 'unknown' ? 'No branch found for this IFSC. Check it, or type the branch under More.'
+          : ifscInfo?.status === 'offline' ? 'Offline: type the branch under More if you like.'
             : 'The bank and branch fill in from the IFSC';
   const save = () => {
     setTried(true);

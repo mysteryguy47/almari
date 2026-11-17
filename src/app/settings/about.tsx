@@ -14,7 +14,7 @@ const LOCKED = [
   'A new phone is let in by your other device or a family member, after both screens show the same six symbols, or by your printed Recovery Kit.',
   Platform.OS === 'web'
     ? 'On this device, everything Almari saves is encrypted with a key the browser keeps and never lets out.'
-    : 'On this phone, everything Almari saves is encrypted with a key held in the Android Keystore, which never lets it out.',
+    : 'On this phone, everything Almari saves is encrypted with a key held in the Android Keystore, which never lets it out. Its screens cannot be screenshotted or recorded, and stay blank in recent apps.',
 ];
 
 const LIMITS = [

@@ -53,11 +53,13 @@ export default function Home() {
   const { family, viewer } = ctx;
 
   return (
-    <Screen back={false} bottomInset={TAB_BAR_HEIGHT} testID="home">
-      <View style={styles.top}>
-        <View style={styles.flex}>
-          <Nameplate name={family.name} est={data.est} onPress={() => setSwitcher(true)} testID="nameplate" />
-        </View>
+    <Screen
+      back={false}
+      bottomInset={TAB_BAR_HEIGHT}
+      testID="home"
+      // The family's nameplate stays in the fixed header while the page scrolls under it.
+      heading={<Nameplate name={family.name} est={data.est} onPress={() => setSwitcher(true)} testID="nameplate" />}
+      right={
         <Pressable
           onPress={() => router.push('/search')}
           accessibilityRole="button"
@@ -66,7 +68,8 @@ export default function Home() {
         >
           <Icon name="Search" size={22} />
         </Pressable>
-      </View>
+      }
+    >
 
       {family.isSample ? (
         <Card style={styles.sample}>
@@ -217,7 +220,6 @@ export default function Home() {
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  top: { flexDirection: 'row', alignItems: 'center', gap: space.md, marginBottom: space.lg },
   round: { width: 46, height: 46, borderRadius: 23, alignItems: 'center', justifyContent: 'center', borderWidth: StyleSheet.hairlineWidth },
   sample: { gap: space.md, marginBottom: space.lg },
   sampleRow: { flexDirection: 'row', alignItems: 'center', gap: space.md },

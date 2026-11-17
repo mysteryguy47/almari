@@ -31,7 +31,7 @@ export default function Families() {
           <Row
             key={f.id}
             title={f.name}
-            subtitle={`${f.members.length} members`}
+            subtitle={`${f.members.length} ${f.members.length === 1 ? 'member' : 'members'}`}
             icon="House"
             tint="inland"
             divider={i > 0}

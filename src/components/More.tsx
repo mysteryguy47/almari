@@ -1,5 +1,5 @@
 /**
- * "More details": the fields most people skip, folded away so a form shows
+ * "More": the fields most people skip, folded away so a form shows
  * only what matters. Opens with a tap, or by itself when something inside
  * needs attention. Says how many details are already filled in.
  */
@@ -30,7 +30,7 @@ export interface MoreProps {
   testID?: string;
 }
 
-export function More({ title = 'More details', summary, filled = 0, initiallyOpen = false, open: controlled, onToggle, children, testID }: MoreProps) {
+export function More({ title = 'More', summary, filled = 0, initiallyOpen = false, open: controlled, onToggle, children, testID }: MoreProps) {
   const { palette } = useTheme();
   const lift = useLift();
   const [own, setOwn] = useState(initiallyOpen);
