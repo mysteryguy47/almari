@@ -48,3 +48,7 @@ tests/e2e/.out/
 # App bundles and APKs downloaded from EAS
 *.aab
 *.apk
+
+# EAS signing credentials downloaded for moving keys: never commit
+credentials.json
+credentials/
