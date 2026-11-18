@@ -14,6 +14,7 @@ import {
   addMonths,
   daysBetween,
   daysInMonth,
+  formatDate,
   parseISODate,
   toISODate,
   ymdFromDate,
@@ -209,7 +210,7 @@ export function plannedNotifications(family: Family, viewerId: ID, now: Date = n
       out.push({
         at: `${date}T09:00`,
         title: `${doc.title} ${template.expiry?.label === 'Valid till' ? 'expires' : 'is due'} soon`,
-        body: `${familyName}: due on ${doc.expiryDate}. Tap to see it.`,
+        body: `${familyName} · ${template.expiry?.label === 'Valid till' ? 'valid till' : 'due on'} ${formatDate(doc.expiryDate)}`,
         key: `doc:${doc.id}:${date}`,
       });
     }
@@ -225,7 +226,7 @@ export function plannedNotifications(family: Family, viewerId: ID, now: Date = n
       out.push({
         at: `${date}T09:00`,
         title: `${card.bank} card bill due ${daysBefore === 1 ? 'tomorrow' : `in ${daysBefore} days`}`,
-        body: `Due on ${due}.`,
+        body: `Due on ${formatDate(due)}`,
         key: `bill:${card.id}:${date}`,
       });
     }
@@ -246,4 +247,17 @@ export function plannedNotifications(family: Family, viewerId: ID, now: Date = n
   }
 
   return out.sort((a, b) => a.at.localeCompare(b.at));
+}
+
+/**
+ * Where tapping a reminder opens, from its key ("doc:<id>:<date>",
+ * "bill:<id>:<date>", "task:<id>:eve"). Undefined for a key we do not know.
+ */
+export function routeForReminder(key: string): string | undefined {
+  const [kind, id] = key.split(':');
+  if (!id) return undefined;
+  if (kind === 'doc') return `/doc/${id}`;
+  if (kind === 'bill') return `/card/${id}`;
+  if (kind === 'task') return `/task/${id}`;
+  return undefined;
 }

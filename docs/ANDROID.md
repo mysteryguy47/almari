@@ -9,7 +9,8 @@ The Android app is the same code as the web app, built into a real app by **EAS 
 - **No screenshots or screen recordings** of Almari, and it shows blank in the recent-apps view (Android's secure-window flag, `src/lib/screen-guard.ts`). Sharing a paper on purpose still works through Share. This needs the `DETECT_SCREEN_CAPTURE` permission on Android 14+, an ordinary one with no prompt; the photo-library permissions the same library would add are blocked in `app.json`.
 - **Google sign-in** opens Google's page in a secure in-app browser and comes back to the app at `almari://auth/callback`. No Android client ID or SHA-1 is needed.
 - **Email and invite links** point to the website (`EXPO_PUBLIC_SITE_URL`, default `https://almari.blackmonkey.in`), so they work on any device. Invite links open straight in the app once App Links are verified (step 10). Until then, an invited person can sign in on the phone and tap **Ask to join**.
-- **Not on Android yet:** reading numbers from a photo, and reading the Recovery Kit's QR from a photo (typing its 24 words works). Both arrive with Google ML Kit.
+- **Reminders are phone notifications**, scheduled on the phone itself (`src/lib/notify.ts`, `expo-notifications`): no push server, no Firebase. Almari asks for the notification permission once, right after someone saves a date that will remind them, and Settings → Reminders shows whether they are on. Times are approximate (Android may batch them within the hour) because exact alarms need a permission Play restricts to alarm and calendar apps.
+- **Reading numbers and the Recovery Kit's QR from a photo** uses Google ML Kit inside the app (`src/lib/ocr.ts`, `src/lib/qr-read.ts`), so photos never leave the phone. ML Kit does send Google basic diagnostics; see the data safety answers below.
 
 ## Your steps (one time)
 
@@ -109,13 +110,13 @@ Then **Dashboard → Set up your app**. Answers that match the app today:
   - **Personal info → Name**: required (asked at sign-up, or from Google).
   - **Device or other IDs**: a random id per device and its name, used to let devices in and remove them.
 - Family papers, files, photos, numbers and passwords are **end-to-end encrypted**: the server stores them but cannot read them. Google's help beside the form lists the cases that need not be declared; check whether end-to-end encrypted data is one of them when you fill it. If in doubt, also declare **Files and docs**, **Photos** and **Financial info → Other financial info** as collected for *App functionality*, and say in the description that they are end-to-end encrypted. Declaring more is never a problem; declaring less can be.
-- Nothing is shared with third parties, used for ads, or used for analytics.
+- **App info and performance → Diagnostics** and **Device or other IDs**: collected by Google ML Kit when someone reads a number or a QR code from a photo (phone model, app version, an installation ID, how the reading performed). Purpose: *Analytics*. Optional, encrypted in transit, not shared. The photo and its text never leave the phone.
+- Nothing is shared with third parties or used for ads.
 
 **Store listing** (Grow → Store presence → Main store listing):
 
-- Short description, up to 80 characters, for example: *Your family's papers, IDs, passwords and bank details, locked in one place.*
-- Full description: what it keeps, end-to-end encryption, phone-only mode, the family, the Recovery Kit, and a line that it is not affiliated with the Government of India, UIDAI or any bank.
-- App icon 512 × 512 PNG, feature graphic 1024 × 500, and at least 2 phone screenshots. The Android app blocks screenshots, so take these from the web app at phone size (Chrome → Inspect → device toolbar, 1080 × 2400) with the sample family; the screens are the same. Category: **Productivity**. Contact email: the same as step 2.
+- Name, short and full description: copy them from [PLAY-LISTING.md](PLAY-LISTING.md).
+- Icon, feature graphic and screenshots for phone, 7-inch tablet, 10-inch tablet and Chromebook are ready in [`store/play/`](../store/play); [`store/README.md`](../store/README.md) maps each file to its box in Play Console. They come from the web app with the sample family, because the Android app blocks screenshots; the screens are the same code. Category: **Productivity**. Contact email: the same as step 2.
 
 ### 8. Internal testing (start testing today)
 

@@ -4,6 +4,7 @@ import { StyleSheet, View } from 'react-native';
 import { IconTile } from '@/components/Bits';
 import { ToggleRow } from '@/components/Fields';
 import { Card, Screen, Section } from '@/components/Layout';
+import { NotifyCard } from '@/components/NotifyCard';
 import { T } from '@/components/Text';
 import { prefsFor } from '@/domain/reminders';
 import { CATEGORIES } from '@/domain/templates';
@@ -26,6 +27,7 @@ export default function ReminderSettings() {
 
   return (
     <Screen title="Reminders" subtitle="Only affects you" testID="reminder-settings">
+      {!ctx.family.isSample ? <NotifyCard /> : null}
       <Card style={styles.card}>
         <ToggleRow
           title="Family reminders"

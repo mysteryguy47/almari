@@ -147,25 +147,46 @@ export interface RowProps {
   divider?: boolean;
   testID?: string;
   danger?: boolean;
+  /** `right` is a button of its own (Call): it sits beside the row's tap area, not inside it. */
+  rightIsAction?: boolean;
 }
 
 /** One line in a list: icon, words, and what happens on tap. Rows are at least 56 tall. */
-export function Row({ title, subtitle, icon, tint = 'almari', left, right, onPress, chevron = !!onPress, divider = false, testID, danger }: RowProps) {
+export function Row({ title, subtitle, icon, tint = 'almari', left, right, onPress, chevron = !!onPress, divider = false, testID, danger, rightIsAction }: RowProps) {
   const { palette } = useTheme();
-  const content = (
-    <View style={[styles.row, divider ? { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: palette.line } : null]}>
+  const edge = divider ? { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: palette.line } : null;
+  const words = (
+    <>
       {left ?? (icon ? <IconTile icon={icon} tint={danger ? 'sindoor' : tint} size={40} /> : null)}
       <View style={styles.rowText}>
         <T variant="bodyStrong" color={danger ? 'sindoor' : 'ink'} numberOfLines={2}>{title}</T>
         {subtitle ? <T variant="small" color="ink2" numberOfLines={2}>{subtitle}</T> : null}
       </View>
+    </>
+  );
+  const label = subtitle ? `${title}, ${subtitle}` : title;
+  if (onPress && rightIsAction) {
+    // A button inside a button is invalid on the web and confuses screen readers: keep them side by side.
+    return (
+      <View style={[styles.rowSplit, edge]}>
+        <Pressy testID={testID} onPress={onPress} scaleTo={0.985} accessibilityLabel={label} outerStyle={styles.rowSplitMain} style={[styles.row, styles.rowSplitInner]}>
+          {words}
+          {chevron ? <Icon name="ChevronRight" size={20} color="ink3" /> : null}
+        </Pressy>
+        {right}
+      </View>
+    );
+  }
+  const content = (
+    <View style={[styles.row, edge]}>
+      {words}
       {right}
       {chevron ? <Icon name="ChevronRight" size={20} color="ink3" /> : null}
     </View>
   );
   if (!onPress) return <View testID={testID}>{content}</View>;
   return (
-    <Pressy testID={testID} onPress={onPress} scaleTo={0.985} accessibilityLabel={subtitle ? `${title}, ${subtitle}` : title}>
+    <Pressy testID={testID} onPress={onPress} scaleTo={0.985} accessibilityLabel={label}>
       {content}
     </Pressy>
   );
@@ -234,6 +255,9 @@ const styles = StyleSheet.create({
   sectionHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 2, minHeight: 24 },
   row: { flexDirection: 'row', alignItems: 'center', gap: space.md, paddingVertical: space.md, paddingHorizontal: space.lg, minHeight: 64 },
   rowText: { flex: 1, gap: 1 },
+  rowSplit: { flexDirection: 'row', alignItems: 'center', paddingRight: space.lg },
+  rowSplitMain: { flex: 1 },
+  rowSplitInner: { paddingRight: space.sm },
   empty: { alignItems: 'center', gap: space.sm, paddingVertical: space.xxxl, paddingHorizontal: space.lg },
   or: { flexDirection: 'row', alignItems: 'center', gap: space.md, marginVertical: space.xl },
   orLine: { flex: 1, height: StyleSheet.hairlineWidth },

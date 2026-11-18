@@ -12,7 +12,7 @@ import { CONTACT_EMAIL } from '@/lib/contact';
 import { space } from '@/theme/tokens';
 
 const CONTACT = CONTACT_EMAIL ? `write to ${CONTACT_EMAIL}` : 'write to the contact email on Almari’s Google Play page';
-const UPDATED = '17 November 2026';
+const UPDATED = '18 November 2026';
 
 const PARTS: { title: string; points: string[] }[] = [
   {
@@ -20,7 +20,7 @@ const PARTS: { title: string; points: string[] }[] = [
     points: [
       'Almari keeps your family’s papers, ID numbers, passwords, bank and card details. We built it so that we cannot read them.',
       'Everything you add is encrypted on your device before it is saved or sent. The keys stay on your family’s devices and in your printed Recovery Kit; our server never has them.',
-      'No ads, no tracking, no analytics, and we never sell or share your data.',
+      'No ads, no tracking and no analytics of our own, and we never sell or share your data.',
     ],
   },
   {
@@ -50,6 +50,7 @@ const PARTS: { title: string; points: string[] }[] = [
       'Google, only if you choose “Continue with Google”.',
       'Razorpay’s public IFSC lookup: when you type an IFSC code while online, that code (and nothing else) is sent to fetch the bank’s branch name.',
       'Reading numbers from a photo happens on your device. The web app downloads the reading model from a public code library (jsDelivr); your photo is not sent.',
+      'On Android, Google ML Kit, built into the app, reads numbers and the Recovery Kit’s QR code from a photo. The photo and its text never leave your phone; ML Kit sends Google basic diagnostics (the phone model, the app version, an installation ID and how the reading performed).',
     ],
   },
   {
@@ -57,6 +58,7 @@ const PARTS: { title: string; points: string[] }[] = [
     points: [
       'What Almari saves on your phone or browser is encrypted with a key that the device keeps (the Android Keystore, or the browser’s protected key store).',
       'Camera, photos and files are used only when you add a paper. Fingerprint or face unlock is checked by your phone; Almari never sees it.',
+      'Reminders are scheduled on the phone itself, with no push server. They name the paper or task, never its number.',
     ],
   },
   {

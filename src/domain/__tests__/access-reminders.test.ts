@@ -1,7 +1,7 @@
 import { canSee } from '../access';
 import {
   attentionFor, cardBillRecipients, cardExpiryDate, expiryRecipients, nextMonthlyDate, plannedNotifications,
-  reminderDates, taskRecipients,
+  reminderDates, routeForReminder, taskRecipients,
 } from '../reminders';
 import { card, doc, family, member, NOW, task } from './factory';
 
@@ -143,5 +143,25 @@ describe('when reminders fire', () => {
       const hour = Number(p.at.slice(11, 13));
       expect(hour >= 8 && hour < 22).toBe(true);
     }
+  });
+});
+
+describe('phone notifications', () => {
+  it('say the date in words and name no numbers', () => {
+    const f = family();
+    f.documents.push(doc('passport', { title: "Papa's passport", templateId: 'passport', ownerId: 'papa', number: 'X1234567', expiryDate: '2027-11-10' }));
+    const planned = plannedNotifications(f, 'papa', NOW).filter((p) => p.key.startsWith('doc:passport:'));
+    expect(planned.length).toBeGreaterThan(0);
+    for (const p of planned) {
+      expect(p.body).toContain('10 Nov 2027');
+      expect(`${p.title} ${p.body}`).not.toContain('X1234567');
+    }
+  });
+
+  it('open the paper, card or task they are about', () => {
+    expect(routeForReminder('doc:abc:2026-12-01')).toBe('/doc/abc');
+    expect(routeForReminder('bill:c1:2026-12-01')).toBe('/card/c1');
+    expect(routeForReminder('task:t1:eve')).toBe('/task/t1');
+    expect(routeForReminder('nonsense')).toBeUndefined();
   });
 });

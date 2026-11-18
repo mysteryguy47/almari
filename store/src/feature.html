@@ -1,0 +1,72 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="fonts.css">
+<style>
+  html,body{margin:0;width:1024px;height:500px;overflow:hidden}
+  .fg{position:relative;width:1024px;height:500px;background:radial-gradient(ellipse 620px 420px at 250px 230px,#4C7866 0%,#35594B 52%,#26443A 100%);}
+  .rule{position:absolute;left:0;right:0;top:0;bottom:0;background:
+    repeating-linear-gradient(90deg,rgba(255,255,255,0.025) 0 1px,transparent 1px 64px);}
+  svg.art{position:absolute;left:52px;top:28px}
+  .copy{position:absolute;left:470px;top:118px;width:500px;color:#FFFCF6}
+  .word{font:700 118px/0.95 'Eczar';letter-spacing:-1.5px;margin:0}
+  .tag{font:500 34px/1.2 'Anek';color:#E2C58E;margin:16px 0 0}
+  .line{font:400 23px/1.35 'Anek';color:rgba(255,252,246,0.82);margin:22px 0 0;letter-spacing:0.2px}
+  .dot{display:inline-block;width:5px;height:5px;border-radius:3px;background:#D2B27A;margin:0 12px;vertical-align:middle;transform:translateY(-2px)}
+</style></head><body><div class="fg"><div class="rule"></div>
+<svg class="art" width="400" height="450" viewBox="0 0 400 450" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="steel" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFFCF5"/><stop offset="1" stop-color="#EAE0CC"/></linearGradient>
+    <linearGradient id="doorIn" x1="1" y1="0" x2="0" y2="0"><stop offset="0" stop-color="#E9DFCB"/><stop offset="1" stop-color="#D3C6AC"/></linearGradient>
+    <linearGradient id="inside" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1B2E26"/><stop offset="1" stop-color="#22382F"/></linearGradient>
+    <linearGradient id="brass" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#F0D7A4"/><stop offset=".45" stop-color="#D6B378"/><stop offset="1" stop-color="#A9864C"/></linearGradient>
+    <linearGradient id="shade" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#000" stop-opacity=".45"/><stop offset="1" stop-color="#000" stop-opacity="0"/></linearGradient>
+    <filter id="lift" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="14" stdDeviation="16" flood-color="#0B1712" flood-opacity=".45"/></filter>
+    <filter id="blur"><feGaussianBlur stdDeviation="10"/></filter>
+  </defs>
+  <ellipse cx="225" cy="420" rx="170" ry="14" fill="#0B1712" opacity=".5" filter="url(#blur)"/>
+  <!-- legs -->
+  <rect x="122" y="398" width="34" height="30" rx="7" fill="#D9CFBA"/>
+  <rect x="306" y="398" width="34" height="30" rx="7" fill="#D9CFBA"/>
+  <!-- body -->
+  <g filter="url(#lift)"><rect x="110" y="40" width="240" height="368" rx="30" fill="url(#steel)"/></g>
+  <!-- left half: open, showing the inside -->
+  <rect x="124" y="54" width="104" height="340" rx="14" fill="url(#inside)"/>
+  <rect x="124" y="54" width="22" height="340" fill="url(#shade)" opacity=".8"/>
+  <!-- shelves -->
+  <rect x="124" y="166" width="104" height="7" fill="#C9BBA0"/>
+  <rect x="124" y="280" width="104" height="7" fill="#C9BBA0"/>
+  <!-- top shelf: files standing -->
+  <rect x="134" y="96" width="18" height="70" rx="3" fill="#2E5381"/>
+  <rect x="136" y="104" width="14" height="10" rx="2" fill="#E0E8F2"/>
+  <rect x="154" y="86" width="20" height="80" rx="3" fill="#C9A15C"/>
+  <rect x="157" y="96" width="14" height="10" rx="2" fill="#F2E6CF"/>
+  <rect x="176" y="100" width="16" height="66" rx="3" fill="#A2311E"/>
+  <rect x="194" y="92" width="18" height="74" rx="3" fill="#51449A" transform="rotate(8 203 166)"/>
+  <!-- middle shelf: folders lying flat, and a passport -->
+  <rect x="132" y="252" width="84" height="12" rx="3" fill="#E9DFCB"/>
+  <rect x="136" y="240" width="78" height="12" rx="3" fill="#2E5381"/>
+  <rect x="133" y="228" width="80" height="12" rx="3" fill="#C9A15C"/>
+  <rect x="150" y="264" width="62" height="16" rx="3" fill="#7A1F14"/>
+  <rect x="174" y="268" width="14" height="8" rx="4" fill="#D6B378" opacity=".8"/>
+  <!-- bottom: the little locker -->
+  <rect x="140" y="318" width="74" height="62" rx="8" fill="#5C6F66"/>
+  <rect x="146" y="324" width="62" height="50" rx="6" fill="#6E8278"/>
+  <circle cx="177" cy="345" r="5" fill="url(#brass)"/>
+  <rect x="175" y="347" width="4" height="12" rx="2" fill="url(#brass)"/>
+  <!-- centre post -->
+  <rect x="228" y="40" width="8" height="368" fill="#2B493E"/>
+  <!-- right door, closed -->
+  <rect x="244" y="62" width="92" height="324" rx="22" fill="#34574A"/>
+  <rect x="252" y="70" width="76" height="308" rx="16" fill="#EFE7D7"/>
+  <rect x="242" y="196" width="13" height="56" rx="6.5" fill="url(#brass)"/>
+  <rect x="241" y="264" width="17" height="26" rx="6" fill="url(#brass)"/>
+  <circle cx="249.5" cy="273" r="3.4" fill="#2A3B33"/><path d="M248 274 h3 l1.2 8 h-5.4z" fill="#2A3B33"/>
+  <!-- left door swung open toward us -->
+  <path d="M110 44 L36 74 L36 384 L110 404 Z" fill="url(#doorIn)"/>
+  <path d="M100 66 L48 86 L48 370 L100 386 Z" fill="none" stroke="#34574A" stroke-width="5" stroke-linejoin="round"/>
+  <path d="M110 44 L110 404" stroke="#C6B898" stroke-width="3"/>
+</svg>
+<div class="copy">
+  <p class="word">Almari</p>
+  <p class="tag">Ghar ke saare kaagaz, ek jagah.</p>
+  <p class="line">Family document vault<span class="dot"></span>Encrypted on your phone</p>
+</div>
+</div></body></html>

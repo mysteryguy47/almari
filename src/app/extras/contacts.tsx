@@ -30,6 +30,7 @@ export default function Contacts() {
               divider={i > 0}
               chevron={false}
               onPress={() => router.push(`/contact/${c.id}`)}
+              rightIsAction
               right={
                 <Pressable onPress={() => callNumber(c.phone)} accessibilityRole="button" accessibilityLabel={`Call ${c.name}`} hitSlop={6} style={[styles.call, { backgroundColor: palette.accentSoft }]}>
                   <Icon name="Phone" size={20} color="accent" />

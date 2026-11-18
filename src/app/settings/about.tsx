@@ -21,7 +21,7 @@ const LIMITS = [
   'If you lose every device, have no Recovery Kit and nobody in your family can approve you, your Only me items cannot be recovered. That is the price of “even we cannot read it”.',
   'Encryption protects the family from outsiders, not from choices inside it: a member can forward what is shared with them.',
   'Making an item private later removes it from others’ phones at their next sync, but cannot recall a copy already shared.',
-  'Phone notifications, reading numbers from photos on Android, Hindi and an independent security audit are still to come.',
+  'Notifications on iPhone, Hindi and an independent security audit are still to come.',
 ];
 
 export default function About() {

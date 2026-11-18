@@ -15,6 +15,7 @@ import { addDays, formatDate, formatDateTime, toISODate, ymdFromDate } from '@/d
 import type { Repeat } from '@/domain/types';
 import { checkTaskTitle, LIMITS } from '@/domain/validation';
 import { REPEATS } from '@/lib/options';
+import { askOnceForReminders } from '@/lib/notify';
 import { useApp } from '@/store/app-store';
 import { useCtx } from '@/store/hooks';
 import { toast } from '@/store/ui-store';
@@ -63,6 +64,8 @@ export default function TaskScreen() {
     const who = assignees.length ? assignees.map((a) => (a === viewerId ? 'you' : displayName(findMember(family, a)))).join(', ') : 'anyone';
     toast(task ? 'Task updated' : `Assigned to ${who}${hasDue ? `, due ${formatDate(date)}` : ''}`, { tone: 'success' });
     goBack();
+    // A due date that will remind someone: the moment to ask for notifications, once.
+    if (hasDue && !family.isSample) void askOnceForReminders();
   };
 
   const othersAssigned = task && task.assignees.some((a) => a !== viewerId);

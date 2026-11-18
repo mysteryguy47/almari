@@ -9,7 +9,7 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "icon": "./assets/images/icon.png",
-      "bundleIdentifier": "com.blackmonkey.almari"
+      "bundleIdentifier": "in.blackmonkey.almari"
     },
     "android": {
       "adaptiveIcon": {
@@ -19,7 +19,7 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.blackmonkey.almari",
+      "package": "in.blackmonkey.almari",
       "blockedPermissions": [
         "android.permission.RECORD_AUDIO",
         "android.permission.SYSTEM_ALERT_WINDOW",
@@ -86,13 +86,34 @@
       ],
       "expo-font",
       "react-native-libsodium",
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/notification-icon.png",
+          "color": "#34574A"
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Almari uses the camera to photograph your documents.",
+          "recordAudioAndroid": false,
+          "barcodeScannerEnabled": true
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": false,
       "reactCompiler": true
     },
     "description": "Ghar ke saare kaagaz, ek jagah. A family vault for documents, ID numbers, passwords and bank details.",
-    "backgroundColor": "#12110E"
+    "backgroundColor": "#12110E",
+    "extra": {
+      "eas": {
+        "projectId": "f2ed7011-676c-4aa2-953f-187ef29eb2d3"
+      }
+    },
+    "owner": "ayushkhurana47s-team"
   }
 }

@@ -9,8 +9,10 @@ import { displayName, findMember } from '@/domain/access';
 import { formatDateTime, relativeDays } from '@/domain/dates';
 import { lifeStageNudges } from '@/domain/nudges';
 import { attentionFor, plannedNotifications } from '@/domain/reminders';
+import { NotifyCard } from '@/components/NotifyCard';
 import { NudgeCards } from '@/components/Nudges';
 import { attentionHref, stampFor } from '@/lib/attention';
+import { NOTIFY_AVAILABLE } from '@/lib/notify';
 import { useCtx } from '@/store/hooks';
 import { space } from '@/theme/tokens';
 
@@ -53,6 +55,7 @@ export default function Reminders() {
         </Section>
       ) : null}
       <Section title="Coming up on this phone">
+        {!ctx.family.isSample ? <NotifyCard /> : null}
         <Card padded={false}>
           {data.planned.length ? (
             data.planned.map((p, i) => (
@@ -62,7 +65,13 @@ export default function Reminders() {
             <T variant="small" color="ink2" style={styles.pad}>No reminders scheduled.</T>
           )}
         </Card>
-        <T variant="small" color="ink3">Quiet hours 10 pm to 8 am. For now reminders show here; phone notifications come with the Android app and iPhone web push.</T>
+        <T variant="small" color="ink3">
+          {ctx.family.isSample
+            ? 'The sample family never sends notifications.'
+            : NOTIFY_AVAILABLE
+              ? 'Quiet hours 10 pm to 8 am. Reminders reach every phone in the family that has Almari.'
+              : 'Quiet hours 10 pm to 8 am. In the browser, reminders show here and on Home; the Android app also sends them as notifications.'}
+        </T>
       </Section>
       <Row title="Choose what you are reminded about" icon="Settings" onPress={() => router.push('/settings/reminders')} />
     </Screen>

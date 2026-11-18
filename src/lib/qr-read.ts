@@ -1,6 +1,9 @@
-/** Android: reading the kit's QR from a photo arrives with the installed app (ML Kit barcode scanning). */
-export const QR_READ_AVAILABLE = false;
+/** Android: reads the Recovery Kit's QR from a photo with ML Kit barcode scanning, on the phone. */
+import { scanFromURLAsync } from 'expo-camera';
 
-export async function readQrFromImage(_uri: string): Promise<string | null> {
-  return null;
+export const QR_READ_AVAILABLE = true;
+
+export async function readQrFromImage(uri: string): Promise<string | null> {
+  const found = await scanFromURLAsync(uri, ['qr']);
+  return found[0]?.data ?? null;
 }

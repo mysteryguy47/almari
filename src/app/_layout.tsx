@@ -16,6 +16,7 @@ import { DeviceRequestsHost } from '@/components/DeviceRequests';
 import { AppLock, BehindLock, ReauthHost } from '@/components/Security';
 import { ToastHost } from '@/components/Toast';
 import { useApp } from '@/store/app-store';
+import { startNotifications } from '@/lib/notify';
 import { guardScreen } from '@/lib/screen-guard';
 import { requestPersistentStorage } from '@/store/idb';
 import { resumeSession } from '@/sync/account';
@@ -50,6 +51,13 @@ export default function RootLayout() {
     startCloud();
     resumeSession().catch((e) => console.warn('Could not check the sign-in', e));
   }, [hydrated]);
+
+  useEffect(() => {
+    // Android: reminders as phone notifications, scheduled on the phone. Starts once the screens exist,
+    // so a tap on a notification that opened the app can go straight to its paper or task.
+    if (!ready) return;
+    return startNotifications();
+  }, [ready]);
 
   useEffect(() => {
     // On the web (the iPhone app), ask the browser to keep our storage.

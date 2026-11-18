@@ -31,6 +31,7 @@ import { pickFromCamera, pickFromFiles, pickFromPhotos, type PickResult } from '
 import { useApp } from '@/store/app-store';
 import { initCrypto, randomKey, toB64 } from '@/lib/crypto';
 import { fileUrl, saveFile, type PickedFile } from '@/store/files';
+import { askOnceForReminders } from '@/lib/notify';
 import { useCtx } from '@/store/hooks';
 import { newId } from '@/store/secrets';
 import { toast } from '@/store/ui-store';
@@ -290,6 +291,8 @@ export default function AddDocument() {
       });
       toast(existing ? (renew ? 'Renewed. The reminder starts again.' : 'Saved') : 'Saved. Safe in the almari.', { tone: 'success' });
       router.replace(`/doc/${id}`);
+      // A date that will remind them: the moment to ask for notifications, once.
+      if (expiryDate && !family.isSample) void askOnceForReminders();
     } catch {
       toast('Could not save the file. Is the phone out of space?', { tone: 'warn' });
     } finally {

@@ -24,7 +24,7 @@ Only you should type client secrets and keys. They go into the Google and Supaba
    - Authorized JavaScript origins: `https://almari.blackmonkey.in`, and `http://localhost:8081` while developing (remove it before launch).
    - Authorized redirect URIs: the Supabase callback URL. Copy it from Supabase's Google provider page (Part B, step 5). It looks like `https://<project-ref>.supabase.co/auth/v1/callback`.
    - Create, then copy the **Client ID** and **Client secret** into your password manager.
-6. *Optional, only for a future native account picker; skip it now.* **Clients → Create client → Android**, once per signing key. Package name `com.blackmonkey.almari`, then the key's SHA-1:
+6. *Optional, only for a future native account picker; skip it now.* **Clients → Create client → Android**, once per signing key. Package name `in.blackmonkey.almari`, then the key's SHA-1:
    - **EAS key** (development and preview builds): run `npx eas-cli@latest credentials -p android`, pick the build profile, and copy the *SHA-1 Fingerprint*.
    - **Play App Signing key** (installs from Play, including internal testing): Play Console → Almari → **App integrity → App signing** → *App signing key certificate* → SHA-1. It appears after the first `.aab` upload.
    - **Local debug key** (only for `npx expo run:android` on this Mac): `keytool -list -v -keystore ~/.android/debug.keystore -alias androiddebugkey -storepass android -keypass android`

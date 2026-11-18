@@ -158,7 +158,11 @@ function familyOf(s: PersistedState): Family | undefined {
 
 /** The member the person on this device is, in the current family. */
 export function viewerIdOf(s: PersistedState): ID | undefined {
-  const family = familyOf(s);
+  return viewerIdIn(s, familyOf(s));
+}
+
+/** The member the person on this device is, in any family on it (reminders cover every family, not just the open one). */
+export function viewerIdIn(s: PersistedState, family: Family | undefined): ID | undefined {
   if (!family) return undefined;
   if (family.isSample) return s.session.viewAs ?? SAMPLE_VIEWER_ID;
   if (family.storage === 'local') return family.localViewerId;

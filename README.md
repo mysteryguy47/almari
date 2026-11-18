@@ -67,12 +67,13 @@ npx expo export -p web   # production web build in dist/ (installable, works off
 
 | Works (web and Android) | Still to come |
 | --- | --- |
-| Accounts: email and password with confirmation, Google, reset by email, a Google user adding a password, five-try pause, deleting the account | Android: reading numbers and the Recovery Kit QR from a photo (ML Kit), invite links opening the app (App Links) |
-| End-to-end encryption of every record and file; private items sealed for one person; the server sees only locked boxes | Phone notifications and iPhone web push |
+| Accounts: email and password with confirmation, Google, reset by email, a Google user adding a password, five-try pause, deleting the account | Android: invite links opening the app (App Links) |
+| End-to-end encryption of every record and file; private items sealed for one person; the server sees only locked boxes | iPhone web push |
 | Sync between family phones: offline first, merging two people's edits, live updates, a removed device wiped at its next connection | Email sending from your own domain (SMTP) for family testers |
 | Families, invites by link (WhatsApp, copy, QR) or by email, joining, leaving, removals approved by a second member, up to 3 families | Family key rotation after someone leaves (Phase 2) |
 | New devices: approval from your own device or a family member's with six matching symbols, the printed Recovery Kit (words or QR photo), starting fresh | Hindi and other languages; export as readable folders |
 | Everything from the prototype and Phase 2: 121 templates, locker, to-do, reminders, packs, print sheet, form export, masked Aadhaar, nudges, money map | Independent security audit |
+| Android: reminders as phone notifications, scheduled on the phone; reading numbers and the Recovery Kit QR from a photo with ML Kit, on the phone | |
 
 ## Verified
 
