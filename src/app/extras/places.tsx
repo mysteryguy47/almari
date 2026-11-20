@@ -38,7 +38,7 @@ export default function Places() {
                   key={d.id}
                   title={d.title}
                   subtitle={d.ownerId ? displayName(findMember(ctx.family, d.ownerId)) : 'Family'}
-                  left={<DocThumb templateId={d.templateId} file={mainFiles(d)[0]} width={40} />}
+                  left={<DocThumb templateId={d.templateId} accountId={d.accountId} file={mainFiles(d)[0]} width={40} />}
                   divider={i > 0}
                   onPress={() => router.push(`/doc/${d.id}`)}
                 />

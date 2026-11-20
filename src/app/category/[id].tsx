@@ -38,7 +38,7 @@ function DocList({ docs, family }: { docs: DocItem[]; family: Family }) {
             testID={`doc-${d.id}`}
             title={d.title}
             subtitle={[owner ? displayName(owner) : null, d.expiryDate ? `${getTemplate(d.templateId).expiry?.label ?? 'Expires'} ${formatDate(d.expiryDate)}` : listNumber(d.templateId, d.number)].filter(Boolean).join(' · ')}
-            left={<DocThumb templateId={d.templateId} file={mainFiles(d)[0]} width={44} />}
+            left={<DocThumb templateId={d.templateId} accountId={d.accountId} file={mainFiles(d)[0]} width={44} />}
             divider={i > 0}
             right={stamp ? <Stamp text={stamp.text} tone={stamp.tone} /> : d.onlyMe ? <Stamp text="Only me" /> : undefined}
             onPress={() => router.push(`/doc/${d.id}`)}

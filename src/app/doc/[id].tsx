@@ -10,6 +10,7 @@ import { DocThumb, useFileUrl } from '@/components/DocThumb';
 import { TextField, ToggleRow } from '@/components/Fields';
 import { Icon } from '@/components/Icon';
 import { Card, EmptyState, goBack, Row, Screen, Section } from '@/components/Layout';
+import { PaperMark } from '@/components/ItemMark';
 import { BankMark, DocMark, NumberPlate } from '@/components/Marks';
 import { ValueRow } from '@/components/Secret';
 import { Sheet } from '@/components/Sheet';
@@ -176,7 +177,7 @@ export default function DocumentView() {
   };
 
   return (
-    <Screen title={doc.title} subtitle={owner ? displayName(owner) : vehicle ? vehicle.name : 'Family papers'} testID="doc-view">
+    <Screen title={doc.title} subtitle={owner ? displayName(owner) : vehicle ? vehicle.name : 'Family papers'} mark={<PaperMark doc={doc} family={family} size={36} />} testID="doc-view">
       {dups.length ? (
         <Card style={styles.dup}>
           <View style={styles.dupHead}>

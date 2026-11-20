@@ -10,6 +10,7 @@ import { ChipChoice, Segmented, TextField, ToggleRow } from '@/components/Fields
 import { DeleteItem, NotFound, OnlyMeToggle, OwnerPicker, ownerName } from '@/components/ItemBits';
 import { countFilled, More, MoreGroup } from '@/components/More';
 import { Card, Screen } from '@/components/Layout';
+import { NetworkLogo } from '@/components/NetworkLogo';
 import { ValueRow } from '@/components/Secret';
 import { Sheet } from '@/components/Sheet';
 import { T } from '@/components/Text';
@@ -28,6 +29,7 @@ import { ensureReauth } from '@/lib/reauth';
 import { useApp } from '@/store/app-store';
 import { useCtx } from '@/store/hooks';
 import { toast } from '@/store/ui-store';
+import { useTheme } from '@/theme/ThemeProvider';
 import { space } from '@/theme/tokens';
 
 const GUARD = 'No bank will ever ask you for your CVV or PIN.';
@@ -36,6 +38,7 @@ const NETWORKS = (Object.keys(NETWORK_LABELS) as CardNetwork[]).map((n) => ({ va
 export default function CardScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const ctx = useCtx();
+  const { palette } = useTheme();
   const saveCard = useApp((s) => s.saveCard);
   const toggleMute = useApp((s) => s.toggleMute);
   const c = ctx && id !== 'new' ? ctx.family.cards.find((x) => x.id === id) : undefined;
@@ -189,13 +192,39 @@ export default function CardScreen() {
 
   return (
     <Screen title={c ? 'Edit card' : 'New card'} footer={<Button label="Save" onPress={save} testID="card-save" />} testID="card-edit">
+      {/* The card as it will look, drawn as it is typed: the bank's logo and colour, the network, the last digits. */}
+      <View style={styles.preview} pointerEvents="none">
+        <BankCard
+          card={{
+            ...(c ?? { id: 'draft', ownerId, onlyMe: false, createdBy: viewerId, createdAt: 0, updatedAt: 0, mutedBy: [] }),
+            bank: bank.trim(),
+            type,
+            number: digitsOnly(number),
+            network,
+            expiry: expiry || undefined,
+            nickname: nickname.trim() || undefined,
+            nameOnCard: shownName || undefined,
+          }}
+        />
+      </View>
       <Segmented<CardType> value={type} onChange={setType} options={CARD_TYPES} testID="card-type" />
       <T variant="small" color="ink2" style={styles.hint}>
         {type === 'credit' ? 'A credit card needs no bank account here. Add as many as you have, even several from one bank.' : 'A debit card can point to one of the owner’s accounts.'}
       </T>
       <OwnerPicker family={family} value={ownerId} onChange={setOwnerId} />
       <BankField label="Bank or issuer" value={bank} onChange={setBank} check={checks.bank} showCheck={tried} issuers testID="card-bank" />
-      <TextField label="Card number" value={number} onChangeText={onNumber} keyboardType="number-pad" required check={checks.number} showCheck={tried || digitsOnly(number).length >= 12} helper={network !== 'other' ? NETWORK_LABELS[network] : undefined} testID="card-number-input" />
+      <TextField
+        label="Card number"
+        value={number}
+        onChangeText={onNumber}
+        keyboardType="number-pad"
+        required
+        check={checks.number}
+        showCheck={tried || digitsOnly(number).length >= 12}
+        helper={network !== 'other' ? NETWORK_LABELS[network] : undefined}
+        right={network !== 'other' ? <View style={styles.netLogo}><NetworkLogo network={network} height={16} color={palette.ink} /></View> : undefined}
+        testID="card-number-input"
+      />
       <View style={styles.row}>
         <View style={styles.flex}><TextField label="Valid till (MM/YY)" value={expiry} onChangeText={onExpiry} keyboardType="number-pad" check={checks.expiry} testID="card-expiry" /></View>
       </View>
@@ -265,6 +294,8 @@ const styles = StyleSheet.create({
   block: { marginBottom: space.lg, gap: space.sm },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm, marginTop: -space.sm, marginBottom: space.lg },
   networks: { marginBottom: space.lg },
+  preview: { marginBottom: space.xl },
+  netLogo: { paddingHorizontal: space.sm, justifyContent: 'center' },
   shareCard: { marginBottom: space.md },
   shareRow: { paddingHorizontal: space.lg, paddingVertical: space.xs },
   shareDivider: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: 'rgba(128,128,128,0.25)' },

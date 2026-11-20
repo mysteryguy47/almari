@@ -3,6 +3,7 @@ import { useMemo } from 'react';
 import { StyleSheet } from 'react-native';
 
 import { Stamp } from '@/components/Bits';
+import { itemMark } from '@/components/ItemMark';
 import { Card, EmptyState, Row, Screen, Section } from '@/components/Layout';
 import { T } from '@/components/Text';
 import { displayName, findMember } from '@/domain/access';
@@ -37,6 +38,7 @@ export default function Reminders() {
                   subtitle={[owner ? displayName(owner) : null, a.daysLeft < 0 ? relativeDays(a.daysLeft) : `due ${relativeDays(a.daysLeft)}`].filter(Boolean).join(' · ')}
                   icon={a.kind === 'task' ? 'ListTodo' : a.kind === 'doc' ? 'CalendarClock' : 'CreditCard'}
                   tint={stamp.tone === 'sindoor' ? 'sindoor' : stamp.tone === 'haldi' ? 'haldi' : 'stamp'}
+                  left={itemMark(ctx.family, a.kind, a.itemId)}
                   divider={i > 0}
                   chevron={false}
                   right={<Stamp text={stamp.text} tone={stamp.tone} />}

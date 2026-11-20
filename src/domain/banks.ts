@@ -4,9 +4,9 @@
  *
  * Each bank has its usual short name, the older names people still use
  * ("Vijaya Bank", "Corporation Bank", "Aryavart Bank"), the first four
- * letters of its IFSC where known, and a colour close to its own. The mark
- * Almari draws is its short name on that colour, not the bank's logo: a
- * bank's logo is its trademark.
+ * letters of its IFSC where known (which also names its logo in
+ * assets/logos/banks), and a colour close to its own: the colour of its
+ * cards, and of the mark drawn for banks without a logo.
  */
 import { compactUpper } from './validation';
 
@@ -23,9 +23,11 @@ export interface Bank {
   color?: string;
   /** Other names that should find it: old names of merged banks, nicknames. */
   aka?: string[];
+  /** Its logo's name, when it is not the IFSC's first four letters: an issuer that borrows its bank's logo. */
+  logo?: string;
 }
 
-const b = (name: string, short: string, kind: BankKind, ifsc?: string, color?: string, aka?: string[]): Bank => ({ name, short, kind, ifsc, color, aka });
+const b = (name: string, short: string, kind: BankKind, ifsc?: string, color?: string, aka?: string[], logo?: string): Bank => ({ name, short, kind, ifsc, color, aka, logo });
 
 export const BANKS: readonly Bank[] = [
   // ------------------------------------------------ Public sector
@@ -73,10 +75,10 @@ export const BANKS: readonly Bank[] = [
   b('Suryoday Small Finance Bank', 'SURY', 'small-finance', 'SURY', '#E08A1E', ['suryoday']),
   b('ESAF Small Finance Bank', 'ESAF', 'small-finance', 'ESMF', '#2E7D32', ['esaf']),
   b('Utkarsh Small Finance Bank', 'UTKSH', 'small-finance', 'UTKS', '#1C5A9E', ['utkarsh']),
-  b('Capital Small Finance Bank', 'CAP', 'small-finance', undefined, undefined, ['capital bank']),
-  b('Shivalik Small Finance Bank', 'SHIV', 'small-finance', undefined, undefined, ['shivalik']),
-  b('Unity Small Finance Bank', 'UNITY', 'small-finance', undefined, undefined, ['unity', 'pmc bank', 'punjab and maharashtra co-operative bank']),
-  b('slice Small Finance Bank', 'SLICE', 'small-finance', undefined, undefined, ['slice', 'north east small finance bank']),
+  b('Capital Small Finance Bank', 'CAP', 'small-finance', 'CLBL', '#C8202F', ['capital bank']),
+  b('Shivalik Small Finance Bank', 'SHIV', 'small-finance', 'SMCB', '#0D5A8C', ['shivalik']),
+  b('Unity Small Finance Bank', 'UNITY', 'small-finance', 'UNBA', '#C9A227', ['unity', 'pmc bank', 'punjab and maharashtra co-operative bank']),
+  b('slice Small Finance Bank', 'SLICE', 'small-finance', 'NESF', '#9B0FB8', ['slice', 'north east small finance bank']),
 
   // ------------------------------------------------ Payments banks
   b('India Post Payments Bank', 'IPPB', 'payments', 'IPOS', '#C8202E', ['ippb', 'post office', 'post office savings', 'dak ghar', 'india post']),
@@ -98,18 +100,34 @@ export const BANKS: readonly Bank[] = [
   b('BNP Paribas', 'BNP', 'foreign', 'BNPA', '#00915A', ['bnp']),
   b('SBM Bank India', 'SBM', 'foreign', 'STCB', undefined, ['sbm']),
   b('Crédit Agricole', 'CA', 'foreign', 'CRLY', undefined, ['credit agricole']),
-  b('Emirates NBD', 'ENBD', 'foreign', undefined, undefined, ['emirates']),
-  b('Mashreq Bank', 'MASHR', 'foreign', undefined, undefined, ['mashreq']),
-  b('MUFG Bank', 'MUFG', 'foreign', undefined, undefined, ['bank of tokyo', 'mitsubishi']),
-  b('Mizuho Bank', 'MIZHO', 'foreign', undefined, undefined, ['mizuho']),
-  b('Sumitomo Mitsui Banking Corporation', 'SMBC', 'foreign', undefined, undefined, ['smbc', 'sumitomo']),
-  b('Shinhan Bank', 'SHNHN', 'foreign', undefined, undefined, ['shinhan']),
-  b('Woori Bank', 'WOORI', 'foreign', undefined, undefined, ['woori']),
-  b('KEB Hana Bank', 'HANA', 'foreign', undefined, undefined, ['hana']),
-  b('Qatar National Bank', 'QNB', 'foreign', undefined, undefined, ['qnb']),
-  b('Doha Bank', 'DOHA', 'foreign', undefined, undefined, ['doha']),
-  b('First Abu Dhabi Bank', 'FAB', 'foreign', undefined, undefined, ['fab', 'abu dhabi']),
-  b('Bank of Ceylon', 'BOC', 'foreign', undefined, undefined, ['ceylon']),
+  b('Emirates NBD', 'ENBD', 'foreign', 'EBIL', '#0B2D5B', ['emirates']),
+  b('Mashreq Bank', 'MASHR', 'foreign', 'MSHQ', '#E5591C', ['mashreq']),
+  b('MUFG Bank', 'MUFG', 'foreign', 'BOTM', '#D6001C', ['bank of tokyo', 'mitsubishi']),
+  b('Mizuho Bank', 'MIZHO', 'foreign', 'MHCB', '#1B2A6B', ['mizuho']),
+  b('Sumitomo Mitsui Banking Corporation', 'SMBC', 'foreign', 'SMBC', '#4E7A23', ['smbc', 'sumitomo']),
+  b('Shinhan Bank', 'SHNHN', 'foreign', 'SHBK', '#0046A5', ['shinhan']),
+  b('Woori Bank', 'WOORI', 'foreign', 'HVBK', '#0067AC', ['woori']),
+  b('KEB Hana Bank', 'HANA', 'foreign', 'KOEX', '#008C73', ['hana']),
+  b('Qatar National Bank', 'QNB', 'foreign', 'QNBA', '#5A1A3C', ['qnb']),
+  b('Doha Bank', 'DOHA', 'foreign', 'DOHB', undefined, ['doha']),
+  b('First Abu Dhabi Bank', 'FAB', 'foreign', 'NBAD', '#1E3E8C', ['fab', 'abu dhabi']),
+  b('Bank of Ceylon', 'BOC', 'foreign', 'BCEY', '#1C1C1C', ['ceylon']),
+  b('Société Générale', 'SG', 'foreign', 'SOGE', '#C8102E', ['societe generale', 'socgen']),
+  b('United Overseas Bank', 'UOB', 'foreign', 'UOVB', '#1E3A8A', ['uob']),
+  b('Industrial and Commercial Bank of China', 'ICBC', 'foreign', 'ICBK', '#C8102E', ['icbc']),
+  b('CTBC Bank', 'CTBC', 'foreign', 'CTCB', '#C8102E', ['ctbc', 'chinatrust']),
+  b('Rabobank', 'RABO', 'foreign', 'RABO', '#E9600E', ['rabo']),
+  b('NatWest Markets', 'NWM', 'foreign', 'ABNA', '#42145F', ['natwest', 'rbs', 'royal bank of scotland', 'abn amro']),
+  b('ANZ Bank', 'ANZ', 'foreign', 'ANZB', '#007DBA', ['anz', 'australia and new zealand banking']),
+  b('KB Kookmin Bank', 'KB', 'foreign', 'KBKB', '#8A6D3B', ['kookmin']),
+  b('Industrial Bank of Korea', 'IBK', 'foreign', 'IBKO', '#0B4EA2', ['ibk']),
+  b('Sberbank', 'SBER', 'foreign', 'SABR', '#1A9F29', ['sber']),
+  b('FirstRand Bank', 'FRB', 'foreign', 'FIRN', '#0B3D91', ['firstrand', 'first national bank']),
+  b('Bank of Bahrain and Kuwait', 'BBK', 'foreign', 'BBKM', '#B8862B', ['bbk']),
+  b('Scotiabank', 'SCOTIA', 'foreign', 'NOSC', '#EC111A', ['bank of nova scotia', 'scotia']),
+  b('Sonali Bank', 'SONALI', 'foreign', 'SBLD', '#B88A1E', ['sonali']),
+  b('AB Bank', 'AB', 'foreign', 'ABBL', '#C8202F', ['ab bank bangladesh']),
+  b('Maybank', 'MAY', 'foreign', 'IBBK', '#B8860B', ['malayan banking']),
 
   // ------------------------------------------------ Co-operative banks
   b('Saraswat Co-operative Bank', 'SARAS', 'cooperative', 'SRCB', '#B5262B', ['saraswat']),
@@ -165,8 +183,8 @@ export const BANKS: readonly Bank[] = [
   b('West Bengal Gramin Bank', 'WBGB', 'rural', undefined, undefined, ['paschim banga gramin bank', 'bangiya gramin vikash bank']),
 
   // ------------------------------------------------ Card issuers that are not banks
-  b('SBI Card', 'SBI', 'issuer', undefined, '#1A3E8C', ['sbi card', 'sbi credit card', 'simplyclick', 'cashback sbi']),
-  b('American Express', 'AMEX', 'issuer', undefined, '#1F6FC5', ['amex']),
+  b('SBI Card', 'SBI', 'issuer', undefined, '#1A3E8C', ['sbi card', 'sbi credit card', 'simplyclick', 'cashback sbi'], 'sbin'),
+  b('American Express', 'AMEX', 'issuer', undefined, '#1F6FC5', ['amex'], 'amex'),
   b('OneCard', 'ONE', 'issuer', undefined, '#2B2B2B', ['onecard', 'one card']),
 ];
 
@@ -238,11 +256,13 @@ export function searchBanks(query: string, limit = 6, issuers = false): Bank[] {
 const FALLBACK_COLOURS = ['#2C4A6E', '#4A2C5E', '#2E5A4A', '#6A3B2A', '#3A3F7A', '#5A4A2A', '#2A5A6A'];
 
 export interface BankMarkInfo {
-  /** Up to 5 characters. */
+  /** Up to 6 characters. */
   text: string;
   color: string;
   /** The full name it stands for, when known. */
   name?: string;
+  /** The logo's name, when the bank is known: "sbin", "hdfc". The screen draws it if the file exists. */
+  logo?: string;
 }
 
 /** What the mark shows for a bank name, known or not: "SBI" in SBI's blue, or initials in a quiet colour. */
@@ -251,7 +271,7 @@ export function bankMark(name: string | undefined): BankMarkInfo {
   if (bank) {
     let hash = 0;
     for (const ch of bank.name) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
-    return { text: bank.short, color: bank.color ?? FALLBACK_COLOURS[hash % FALLBACK_COLOURS.length], name: bank.name };
+    return { text: bank.short, color: bank.color ?? FALLBACK_COLOURS[hash % FALLBACK_COLOURS.length], name: bank.name, logo: bank.logo ?? bank.ifsc?.toLowerCase() };
   }
   const clean = (name ?? '').replace(/\b(bank|ltd|limited|of|the|and|co-operative|cooperative)\b/gi, ' ').trim();
   const words = clean.split(/\s+/).filter(Boolean);

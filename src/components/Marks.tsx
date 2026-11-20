@@ -1,11 +1,13 @@
 /**
- * Marks: a bank's short name on its own colour (SBI in blue, HDFC in navy),
- * a document's short name (PAN, DL, RC, PUC), and a vehicle's number plate.
+ * Marks: a bank's logo (SBI's keyhole, HDFC's squares) or, for banks without
+ * one, its short name on its colour; the logo of the office behind a paper
+ * (UIDAI for Aadhaar, Income Tax for PAN) or its short name (DL, RC, PUC);
+ * and a vehicle's number plate.
  *
- * They are Almari's drawings, not logos. Bank logos are their trademarks,
- * and the Aadhaar logo and the national emblem on PAN may not be used by
- * apps outside the government. Text on a colour tells them apart just as fast.
+ * Logos sit on a white tile, the way they are printed, so every colour in
+ * them reads the same in light and dark. The files are in assets/logos.
  */
+import { Image } from 'expo-image';
 import { StyleSheet, View } from 'react-native';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 
@@ -13,10 +15,12 @@ import { bankMark } from '@/domain/banks';
 import type { IconName } from '@/domain/icons';
 import { getCategory, getTemplate } from '@/domain/templates';
 import { formatPlate } from '@/domain/vehicles';
+import { useTheme } from '@/theme/ThemeProvider';
 import { fonts } from '@/theme/tokens';
 
 import { IconTile } from './Bits';
 import { Icon } from './Icon';
+import { BANK_LOGOS, DOC_LOGOS, type LogoAsset } from './logo-assets';
 import { T } from './Text';
 
 const WHITE = '#FFFFFF';
@@ -64,9 +68,48 @@ export function MarkTile({ color, text, icon, size = 40 }: { color: string; text
   );
 }
 
-/** A bank's mark, for any name: known banks in their colour, others by initials. */
+const PAPER_WHITE = '#FFFFFF';
+const PAPER_DIM = '#F2EFE9';
+
+/**
+ * A logo on its tile. Square logos fill about two thirds of it; wide ones
+ * (JP Morgan, FASTag) and tall ones (Dhanlaxmi) stretch further along their
+ * long side, so every logo looks about the same size.
+ */
+export function LogoTile({ logo, size = 40, background, label }: { logo: LogoAsset; size?: number; background?: string; label?: string }) {
+  const { scheme, palette } = useTheme();
+  const r = Math.round(size * 0.3);
+  const k = 0.62;
+  const most = 0.84;
+  const w = logo.aspect >= 1 ? Math.min(k * Math.sqrt(logo.aspect), most) : Math.min(k / Math.sqrt(logo.aspect), most) * logo.aspect;
+  const h = w / logo.aspect;
+  const bg = background ?? (scheme === 'dark' ? PAPER_DIM : PAPER_WHITE);
+  return (
+    <View
+      accessible={!!label}
+      accessibilityLabel={label}
+      style={[
+        styles.tile,
+        { width: size, height: size, borderRadius: r, backgroundColor: bg },
+        !background && scheme !== 'dark' ? { borderWidth: StyleSheet.hairlineWidth, borderColor: palette.line } : null,
+      ]}
+    >
+      {/* Keyed by file: on the web, expo-image otherwise keeps the old logo on top when the bank changes. */}
+      <Image key={logo.source} source={logo.source} style={{ width: Math.round(size * w), height: Math.round(size * h) }} contentFit="contain" transition={0} />
+    </View>
+  );
+}
+
+/** The logo for a bank's mark, if there is a file for it. */
+function bankLogo(name: string | undefined): LogoAsset | undefined {
+  return name ? (BANK_LOGOS[name] ?? DOC_LOGOS[name]) : undefined;
+}
+
+/** A bank's mark, for any name: its logo when known, else its short name or initials on a colour. */
 export function BankMark({ bank, size = 40 }: { bank: string | undefined; size?: number }) {
   const mark = bankMark(bank);
+  const logo = bankLogo(mark.logo);
+  if (logo) return <LogoTile logo={logo} size={size} label={mark.name ?? bank} />;
   return (
     <View accessibilityLabel={mark.name ?? bank} accessible>
       <MarkTile color={mark.color} text={mark.text} size={size} />
@@ -74,35 +117,46 @@ export function BankMark({ bank, size = 40 }: { bank: string | undefined; size?:
   );
 }
 
-/** Papers with a short name everyone knows get it as a mark; colours chosen to tell them apart. */
+/** Papers whose issuing office has a logo everyone knows. The passport gets its cover: gold emblem on navy. */
+const DOC_LOGO_FOR: Record<string, { logo: string; background?: string }> = {
+  aadhaar: { logo: 'aadhaar' },
+  pan: { logo: 'income-tax' },
+  itr: { logo: 'income-tax' },
+  'form-16': { logo: 'income-tax' },
+  'voter-id': { logo: 'eci' },
+  passport: { logo: 'emblem-gold', background: '#1D2A5A' },
+  nps: { logo: 'pfrda' },
+  fastag: { logo: 'fastag' },
+  fssai: { logo: 'fssai' },
+  'esic-card': { logo: 'esic' },
+  'pf-passbook': { logo: 'epfo' },
+  'ayushman-card': { logo: 'pmjay' },
+  udyam: { logo: 'msme' },
+  'post-office-passbook': { logo: 'india-post' },
+};
+
+/** Papers with a short name everyone knows and no logo to use; colours chosen to tell them apart. */
 const DOC_MARKS: Record<string, { text?: string; icon?: IconName; color: string }> = {
-  aadhaar: { icon: 'FingerprintPattern', color: '#B5481E' },
-  pan: { text: 'PAN', color: '#1F4E8C' },
-  'voter-id': { text: 'EPIC', color: '#5A3E8E' },
   'driving-licence': { text: 'DL', color: '#0F6B5C' },
-  passport: { icon: 'BookOpen', color: '#1C2B4E' },
   'birth-certificate': { icon: 'Baby', color: '#9A4E6A' },
   abha: { text: 'ABHA', color: '#0D7472' },
-  'ayushman-card': { text: 'PMJAY', color: '#2B6E3A' },
-  nps: { text: 'PRAN', color: '#3D4F8A' },
-  'pf-passbook': { text: 'UAN', color: '#2D5A88' },
   'apaar-id': { text: 'ABC', color: '#7A3E1D' },
   rc: { text: 'RC', color: '#2C5E8A' },
   puc: { text: 'PUC', color: '#3E7A3A' },
-  fastag: { text: 'TAG', color: '#5A4A1E' },
   'vehicle-insurance': { icon: 'ShieldCheck', color: '#36507A' },
   gst: { text: 'GST', color: '#5B3A7A' },
-  itr: { text: 'ITR', color: '#2F5D50' },
-  'form-16': { text: '16', color: '#46556E' },
   'ration-card': { icon: 'Wheat', color: '#7A5A1E' },
   'cancelled-cheque': { icon: 'Banknote', color: '#3D5A4A' },
 };
 
-/** A document's mark: its short name when it has a well-known one, else its icon on the category's colour. */
+/** A document's mark: its issuer's logo, else its short name, else its icon on the category's colour. */
 export function DocMark({ templateId, size = 40, bank }: { templateId: string; size?: number; bank?: string }) {
   const template = getTemplate(templateId);
   // A cheque or passbook tied to an account carries that bank's mark.
   if (bank && template.perAccount) return <BankMark bank={bank} size={size} />;
+  const withLogo = DOC_LOGO_FOR[template.id];
+  const logo = withLogo ? DOC_LOGOS[withLogo.logo] : undefined;
+  if (withLogo && logo) return <LogoTile logo={logo} size={size} background={withLogo.background} label={template.name} />;
   const mark = DOC_MARKS[template.id];
   if (!mark) return <IconTile icon={template.icon} tint={getCategory(template.category).tint} size={size} />;
   return (

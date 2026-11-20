@@ -6,6 +6,7 @@ import { Avatar, IconTile, Nameplate, Stamp } from '@/components/Bits';
 import { FamilySwitcher, ViewAsSheet } from '@/components/FamilySheets';
 import { NudgeCards } from '@/components/Nudges';
 import { Icon } from '@/components/Icon';
+import { itemMark } from '@/components/ItemMark';
 import { Card, Row, Screen, Section, Tile } from '@/components/Layout';
 import { Pressy } from '@/components/Pressy';
 import { T } from '@/components/Text';
@@ -118,6 +119,7 @@ export default function Home() {
                   subtitle={owner ? `${displayName(owner)} · ${when}` : when}
                   icon={a.kind === 'task' ? 'ListTodo' : a.kind === 'doc' ? 'CalendarClock' : 'CreditCard'}
                   tint={stamp.tone === 'sindoor' ? 'sindoor' : stamp.tone === 'haldi' ? 'haldi' : 'stamp'}
+                  left={itemMark(family, a.kind, a.itemId)}
                   divider={i > 0}
                   chevron={false}
                   right={<Stamp text={stamp.text} tone={stamp.tone} />}

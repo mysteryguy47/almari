@@ -6,11 +6,13 @@ import { getCategory, getTemplate } from '@/domain/templates';
 import type { FileRef } from '@/domain/types';
 import { extensionOf } from '@/domain/validation';
 import { fileUrl } from '@/store/files';
+import { useCtx } from '@/store/hooks';
 import { useTheme } from '@/theme/ThemeProvider';
 import { radius, space, tintColors } from '@/theme/tokens';
 
 import { Stamp } from './Bits';
 import { Icon } from './Icon';
+import { DocMark } from './Marks';
 import { T } from './Text';
 
 const ASPECT = { card: 1.586, a4: 0.707, photo: 0.78 } as const;
@@ -37,8 +39,10 @@ export function useFileUrl(file: FileRef | undefined): string | null {
  * eye knows what it is looking at. Sample documents draw a plain stand-in
  * marked SAMPLE (never anything that resembles a government design).
  */
-export function DocThumb({ templateId, file, width, title }: { templateId: string; file?: FileRef; width: number; title?: string }) {
+export function DocThumb({ templateId, file, width, title, accountId }: { templateId: string; file?: FileRef; width: number; title?: string; accountId?: string }) {
   const { palette } = useTheme();
+  const ctx = useCtx();
+  const bank = accountId ? ctx?.family.bankAccounts.find((a) => a.id === accountId)?.bank : undefined;
   const template = getTemplate(templateId);
   const { fg, bg } = tintColors(palette, getCategory(template.category).tint);
   const url = useFileUrl(file);
@@ -54,6 +58,8 @@ export function DocThumb({ templateId, file, width, title }: { templateId: strin
       />
     );
   }
+  // In a list, a paper without a photo shows its issuer's logo (Aadhaar, Income Tax) at the thumbnail's width.
+  if (width <= 48) return <DocMark templateId={templateId} size={width} bank={bank} />;
   const isSample = file?.kind === 'sample';
   const big = width > 160;
   return (

@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Stamp } from '@/components/Bits';
+import { AccountCard } from '@/components/BankCard';
 import { BankField } from '@/components/BankField';
 import { Button } from '@/components/Button';
 import { blankCredential, CredentialsEditor, CredentialsView } from '@/components/Credentials';
@@ -81,12 +82,8 @@ export default function BankAccountScreen() {
         testID="bank-view"
       >
         <View style={styles.head}>
-          <BankMark bank={a.bank} size={56} />
-          <View style={styles.flex}>
-            <T variant="numberLarge" testID="bank-tail">{maskTail(a.accountNumber)}</T>
-            <T variant="small" color="ink2" numberOfLines={1}>{a.holder || owner?.fullName}{a.branch ? ` · ${a.branch}` : ''}</T>
-          </View>
-          {a.onlyMe ? <Stamp text="Only me" /> : null}
+          <AccountCard account={a} holder={a.holder || owner?.fullName} />
+          {a.onlyMe ? <View style={styles.onlyMe}><Stamp text="Only me" /></View> : null}
         </View>
         <Button label="Share account details" icon="Send" onPress={share} testID="share-account" />
         <T variant="small" color="ink2" style={styles.shareNote}>Sends only the name, account number, IFSC and bank. Never passwords, PIN or CVV.</T>
@@ -256,7 +253,8 @@ export default function BankAccountScreen() {
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  head: { flexDirection: 'row', alignItems: 'center', gap: space.md, marginBottom: space.lg },
+  head: { marginBottom: space.lg },
+  onlyMe: { position: 'absolute', right: space.lg, bottom: -space.md },
   plus: { paddingHorizontal: space.sm },
   stamp: { marginBottom: space.md },
   shareNote: { marginTop: space.sm, marginBottom: space.lg },

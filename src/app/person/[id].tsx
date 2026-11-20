@@ -7,6 +7,7 @@ import { Button } from '@/components/Button';
 import { DocThumb } from '@/components/DocThumb';
 import { Icon } from '@/components/Icon';
 import { Card, Row, Screen, Section } from '@/components/Layout';
+import { BankMark, DocMark } from '@/components/Marks';
 import { ValueRow } from '@/components/Secret';
 import { T } from '@/components/Text';
 import { displayName, findMember, visibleTo } from '@/domain/access';
@@ -106,6 +107,7 @@ export default function Person() {
                 masked={k === 'aadhaar' ? maskAadhaar(member.ids[k] as string) : undefined}
                 copyValue={k === 'aadhaar' ? digitsOnly(member.ids[k] as string) : undefined}
                 guard={k === 'aadhaar' ? 'Share Aadhaar only where it is truly needed. Nobody genuine asks for an OTP on a call.' : undefined}
+                mark={<DocMark templateId={templateForIdKind(k).id} size={22} />}
                 large
               />
             ))}
@@ -160,7 +162,7 @@ export default function Person() {
                   testID={`doc-${d.id}`}
                   title={d.title}
                   subtitle={d.expiryDate ? `${getTemplate(d.templateId).expiry?.label ?? 'Expires'} ${formatDate(d.expiryDate)}` : listNumber(d.templateId, d.number) ?? getTemplate(d.templateId).name}
-                  left={<DocThumb templateId={d.templateId} file={mainFiles(d)[0]} width={44} />}
+                  left={<DocThumb templateId={d.templateId} accountId={d.accountId} file={mainFiles(d)[0]} width={44} />}
                   divider={i > 0}
                   right={d.onlyMe ? <Stamp text="Only me" /> : undefined}
                   onPress={() => router.push(`/doc/${d.id}`)}
@@ -178,10 +180,10 @@ export default function Person() {
         <Section title="Bank and cards">
           <Card padded={false}>
             {accounts.map((a, i) => (
-              <Row key={a.id} title={a.bank} subtitle={`${ACCOUNT_TYPE_LABELS[a.type]} · ${maskTail(a.accountNumber)}`} icon="Landmark" tint="haldi" divider={i > 0} onPress={() => router.push(`/bank/${a.id}`)} />
+              <Row key={a.id} title={a.bank} subtitle={`${ACCOUNT_TYPE_LABELS[a.type]} · ${maskTail(a.accountNumber)}`} left={<BankMark bank={a.bank} />} divider={i > 0} onPress={() => router.push(`/bank/${a.id}`)} />
             ))}
             {cards.map((c, i) => (
-              <Row key={c.id} title={`${c.bank}${c.nickname ? ` ${c.nickname}` : ''}`} subtitle={`${CARD_TYPE_LABELS[c.type]} · ${maskTail(c.number)}`} icon="CreditCard" tint="inland" divider={accounts.length + i > 0} onPress={() => router.push(`/card/${c.id}`)} />
+              <Row key={c.id} title={`${c.bank}${c.nickname ? ` ${c.nickname}` : ''}`} subtitle={`${CARD_TYPE_LABELS[c.type]} · ${maskTail(c.number)}`} left={<BankMark bank={c.bank} />} divider={accounts.length + i > 0} onPress={() => router.push(`/card/${c.id}`)} />
             ))}
           </Card>
         </Section>

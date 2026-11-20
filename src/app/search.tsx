@@ -4,6 +4,7 @@ import { StyleSheet, View } from 'react-native';
 
 import { Chip } from '@/components/Bits';
 import { TextField } from '@/components/Fields';
+import { itemMark } from '@/components/ItemMark';
 import { Card, EmptyState, Row, Screen } from '@/components/Layout';
 import { T } from '@/components/Text';
 import type { IconName } from '@/domain/icons';
@@ -55,6 +56,7 @@ export default function Search() {
               subtitle={[KIND[h.kind].label, h.subtitle].filter(Boolean).join(' · ')}
               icon={KIND[h.kind].icon}
               tint={KIND[h.kind].tint}
+              left={itemMark(ctx.family, h.kind, h.id)}
               divider={i > 0}
               onPress={() => router.push(KIND[h.kind].href(h.id))}
             />

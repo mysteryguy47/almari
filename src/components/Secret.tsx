@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { copyText } from '@/lib/device';
@@ -22,11 +22,13 @@ export interface ValueRowProps {
   /** One calm line shown on reveal: "No bank will ever ask you for these." */
   guard?: string;
   large?: boolean;
+  /** A small logo before the label: the Aadhaar sun, the Income Tax seal. */
+  mark?: ReactNode;
   testID?: string;
 }
 
 /** A number or secret with its own copy button: the number matters more than the file. */
-export function ValueRow({ label, value, secret, masked, copyValue, guard, large, testID }: ValueRowProps) {
+export function ValueRow({ label, value, secret, masked, copyValue, guard, large, mark, testID }: ValueRowProps) {
   const { palette } = useTheme();
   const [shown, setShown] = useState(!secret);
   if (!value) return null;
@@ -47,7 +49,14 @@ export function ValueRow({ label, value, secret, masked, copyValue, guard, large
   return (
     <View style={[styles.row, { borderColor: palette.line }]} testID={testID}>
       <View style={styles.text}>
-        <T variant="label" color="ink2">{label}</T>
+        {mark ? (
+          <View style={styles.labelRow}>
+            {mark}
+            <T variant="label" color="ink2">{label}</T>
+          </View>
+        ) : (
+          <T variant="label" color="ink2">{label}</T>
+        )}
         <T variant={large ? 'numberLarge' : 'number'} selectable={shown} accessibilityLabel={shown ? `${label}: ${value}` : `${label}: hidden`}>
           {shown ? value : masked ?? '••••••••'}
         </T>
@@ -67,6 +76,7 @@ export function ValueRow({ label, value, secret, masked, copyValue, guard, large
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingVertical: space.md, borderBottomWidth: StyleSheet.hairlineWidth },
   text: { flex: 1, gap: 2 },
+  labelRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 },
   action: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 22 },
   copy: {},
 });

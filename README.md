@@ -71,13 +71,15 @@ npx expo export -p web   # production web build in dist/ (installable, works off
 | Share the whole paper | A paper with several pages → Share | All pages as one PDF, or a card's front and back on one A4 page like a photocopy, or one page. |
 | Crop | Any photo, when adding it or under Crop or resize | Free, square, portrait, landscape or ID-card shape; drag the corners or the frame; turn the photo. A photo from the camera opens in the crop tool straight away. |
 | Vehicles | Home → Vehicles | Each car, scooter or tractor has its own page: number plate, RC, insurance, PUC, service records and bills, with the paper that needs doing first. An RC already saved with the same plate files itself. |
-| Banks | Bank account and card forms | About 120 Indian banks suggested from two letters, including old names of merged banks ("Vijaya" finds Bank of Baroda) and each state's gramin bank. Each bank has a mark in its own colour, also on the card itself. |
+| Banks | Bank account and card forms | About 140 banks suggested from two letters, including old names of merged banks ("Vijaya" finds Bank of Baroda), each state's gramin bank and the foreign banks in India. 89 of them show their own logo; the rest show their short name on a colour. |
+| Logos | Everywhere a paper, account or card appears | Bank logos on accounts, cards, cheques and passbooks. The issuing office's logo on papers: UIDAI on Aadhaar, Income Tax on PAN, ITR and Form 16, the Election Commission on voter ID, PFRDA, EPFO, ESIC, PM-JAY, FASTag, FSSAI, MSME and India Post; the passport gets its gold emblem on navy. |
+| Card faces | A card, and the new-card form | The card in its bank's colour with its logo, a gold chip, the tap-to-pay mark and the network's logo (Visa, Mastercard, RuPay, Amex, Diners, JCB). The new-card form draws the card as it is typed. A bank account shows the same way, with the holder and IFSC. |
 | Several logins per account | Bank account → More → Net banking and app logins | One user ID with a login, profile and transaction password, and another login (the bank's app with its MPIN). Website logins can keep a second password too. |
 | Cheque and passbook | Bank account → Cheque, passbook and statements | Filed under the account, with its number and the bank in the title. |
 | Share card details | A card → Share card details | Bank on top, then the name, number, expiry and, if chosen, the CVV. Never the PIN. Asks for the fingerprint or PIN first. |
 | Names filled in | New account or card | The account holder and the name on the card follow the person picked, until typed over. |
 
-Marks are Almari's own drawings (a short name on a colour), not logos: bank logos are trademarks, and the Aadhaar logo and the national emblem may not be used by apps outside the government.
+Logos are in `assets/logos` (WebP, trimmed, at most 160 px). Bank logos come from [praveenpuglia/indian-banks](https://github.com/praveenpuglia/indian-banks), named by the first four letters of the IFSC; the issuing offices' logos and the RuPay, Amex and Mastercard marks from Wikimedia Commons and Wikipedia; Visa, Diners and JCB are drawn from Simple Icons. They are the owners' trademarks, used to recognise the paper or bank. After adding a file, run `node scripts/logo-index.mjs`. Banks and papers without a logo keep a short name on a colour.
 
 ## What works, and what is still to come
 

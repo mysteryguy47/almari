@@ -26,6 +26,8 @@ export interface ScreenProps {
   /** Shown in the fixed header in place of the title: the home screen's family nameplate. */
   heading?: ReactNode;
   subtitle?: string;
+  /** A logo or mark before the title: a paper's issuer, an account's bank. */
+  mark?: ReactNode;
   back?: boolean;
   right?: ReactNode;
   children: ReactNode;
@@ -42,7 +44,7 @@ export function useLift(): ViewStyle | null {
   return scheme === 'light' ? ({ boxShadow: '0 1px 2px rgba(51, 36, 15, 0.04), 0 6px 20px rgba(51, 36, 15, 0.05)' } as ViewStyle) : null;
 }
 
-export function Screen({ title, large, heading, subtitle, back = true, right, children, footer, bottomInset = 0, scroll = true, testID }: ScreenProps) {
+export function Screen({ title, large, heading, subtitle, mark, back = true, right, children, footer, bottomInset = 0, scroll = true, testID }: ScreenProps) {
   const { palette } = useTheme();
   const insets = useSafeAreaInsets();
   // Once the page scrolls, the header gets a hairline edge so it reads as sitting above the content.
@@ -72,6 +74,7 @@ export function Screen({ title, large, heading, subtitle, back = true, right, ch
               <Icon name="ChevronLeft" size={22} />
             </Pressable>
           ) : null}
+          {mark}
           <View style={styles.headerTitle}>
             {heading ?? (title ? <T variant={large ? 'display' : 'heading'} numberOfLines={1} accessibilityRole="header">{title}</T> : null)}
             {!large && !heading && subtitle ? <T variant="small" color="ink2" numberOfLines={1}>{subtitle}</T> : null}
