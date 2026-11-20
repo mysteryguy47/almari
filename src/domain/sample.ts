@@ -12,7 +12,7 @@
  */
 import { addDays, toISODate, ymdFromDate } from './dates';
 import type {
-  BankAccount, CardItem, Contact, DocItem, Family, FileRef, LoginItem, Member, SecureNote, Task,
+  BankAccount, CardItem, Contact, DocItem, Family, FileRef, LoginItem, Member, SecureNote, Task, Vehicle,
 } from './types';
 
 export const SAMPLE_FAMILY_ID = 'sample-sharma';
@@ -75,7 +75,19 @@ export function buildSampleFamily(now: Date = new Date()): Family {
   });
 
   const documents: DocItem[] = [
-    d('s-d-aadhaar-papa', { templateId: 'aadhaar', title: "Papa's Aadhaar", scope: 'personal', ownerId: 's-papa', number: '1234 5678 9012', original: 'Steel almari, top shelf, red file', files: [file('aadhaar-front.jpg', 310), file('aadhaar-back.jpg', 290)] }),
+    d('s-d-aadhaar-papa', {
+      templateId: 'aadhaar', title: "Papa's Aadhaar", scope: 'personal', ownerId: 's-papa', number: '1234 5678 9012', original: 'Steel almari, top shelf, red file',
+      versions: [
+        { id: 'main', label: 'Original', addedAt: t0, addedBy: 's-ananya' },
+        { id: 's-ver-masked', label: 'Masked', addedAt: t0 + 86_400_000, addedBy: 's-ananya' },
+        { id: 's-ver-pvc', label: 'PVC card', addedAt: t0 + 2 * 86_400_000, addedBy: 's-papa' },
+      ],
+      files: [
+        file('aadhaar-front.jpg', 310), file('aadhaar-back.jpg', 290),
+        { ...file('aadhaar-front-masked.jpg', 300), versionId: 's-ver-masked' },
+        { ...file('aadhaar-pvc-front.jpg', 240), versionId: 's-ver-pvc' }, { ...file('aadhaar-pvc-back.jpg', 230), versionId: 's-ver-pvc' },
+      ],
+    }),
     d('s-d-pan-papa', { templateId: 'pan', title: "Papa's PAN", scope: 'personal', ownerId: 's-papa', number: 'DEMOR1001A', original: "Papa's wallet" }),
     d('s-d-dl-papa', { templateId: 'driving-licence', title: "Papa's driving licence", scope: 'personal', ownerId: 's-papa', number: 'XX0420110012345', expiryDate: inDays(25), original: "Papa's wallet" }),
     d('s-d-aadhaar-mummy', { templateId: 'aadhaar', title: "Mummy's Aadhaar", scope: 'personal', ownerId: 's-mummy', number: '1234 5678 9023', original: 'Steel almari, top shelf, red file' }),
@@ -95,9 +107,13 @@ export function buildSampleFamily(now: Date = new Date()): Family {
     d('s-d-aadhaar-dadi', { templateId: 'aadhaar', title: "Dadi's Aadhaar", scope: 'personal', ownerId: 's-dadi', number: '1234 5678 9056', original: "Dadi's trunk" }),
     d('s-d-ppo-dadi', { templateId: 'ppo', title: "Dadi's pension order", scope: 'personal', ownerId: 's-dadi', number: 'PPO 000000123', original: "Dadi's trunk", files: [file('ppo.pdf', 450)] }),
     d('s-d-bruno-vaccine', { templateId: 'pet-vaccination', title: "Bruno's vaccinations", scope: 'personal', ownerId: 's-bruno', expiryDate: inDays(64) }),
-    d('s-d-rc', { templateId: 'rc', title: 'Car RC', scope: 'common', number: 'XX 01 AB 1234', original: 'Car glovebox', files: [file('rc-front.jpg', 300), file('rc-back.jpg', 280)] }),
-    d('s-d-car-ins', { templateId: 'vehicle-insurance', title: 'Car insurance', scope: 'common', number: 'POL/0000/1234', expiryDate: inDays(12), original: 'Car glovebox', files: [file('car-insurance.pdf', 650)] }),
-    d('s-d-puc', { templateId: 'puc', title: 'Car PUC', scope: 'common', expiryDate: inDays(-3), original: 'Car glovebox' }),
+    d('s-d-rc', { templateId: 'rc', title: 'Swift RC', scope: 'common', vehicleId: 's-v-car', number: 'XX 01 AB 1234', original: 'Car glovebox', files: [file('rc-front.jpg', 300), file('rc-back.jpg', 280)] }),
+    d('s-d-car-ins', { templateId: 'vehicle-insurance', title: 'Swift insurance', scope: 'common', vehicleId: 's-v-car', number: 'POL/0000/1234', expiryDate: inDays(12), original: 'Car glovebox', files: [file('car-insurance.pdf', 650)] }),
+    d('s-d-puc', { templateId: 'puc', title: 'Swift PUC', scope: 'common', vehicleId: 's-v-car', expiryDate: inDays(-3), original: 'Car glovebox' }),
+    d('s-d-car-service', { templateId: 'service-record', title: 'Swift service', scope: 'common', vehicleId: 's-v-car', issueDate: inDays(-75), expiryDate: inDays(105), description: '40,000 km service, oil and filters', files: [file('service-bill.pdf', 210)] }),
+    d('s-d-scooter-rc', { templateId: 'rc', title: 'Activa RC', scope: 'common', vehicleId: 's-v-scooter', number: 'XX 01 CD 5678', original: 'Scooter dickey', files: [file('activa-rc.jpg', 260)] }),
+    d('s-d-scooter-ins', { templateId: 'vehicle-insurance', title: 'Activa insurance', scope: 'common', vehicleId: 's-v-scooter', number: 'TW/0000/5678', expiryDate: inDays(160), files: [file('activa-insurance.pdf', 300)] }),
+    d('s-d-cheque-papa', { templateId: 'cancelled-cheque', title: 'SBI cancelled cheque', scope: 'personal', ownerId: 's-papa', createdBy: 's-papa', accountId: 's-b-papa-sbi', number: '000012345678', files: [file('cancelled-cheque.jpg', 180)] }),
     d('s-d-deed', { templateId: 'sale-deed', title: 'House registry', scope: 'common', number: 'REG 0000/2009', issueDate: '2009-03-14', original: 'SBI bank locker 214', files: [file('sale-deed.pdf', 4200)] }),
     d('s-d-tax', { templateId: 'property-tax', title: 'Property tax receipt', scope: 'common', number: 'PID 000-0000', expiryDate: inDays(140), files: [file('tax-receipt.pdf', 180)] }),
     d('s-d-bijli', { templateId: 'electricity', title: 'Electricity connection', scope: 'common', number: 'CA 000123456789' }),
@@ -116,7 +132,20 @@ export function buildSampleFamily(now: Date = new Date()): Family {
   ];
 
   const bankAccounts: BankAccount[] = [
-    { ...base, id: 's-b-papa-sbi', ownerId: 's-papa', createdBy: 's-papa', bank: 'State Bank of India', type: 'savings', accountNumber: '000012345678', ifsc: 'SBIN0001234', branch: 'Lajpat Nagar', nominee: 'Sunita Sharma', netbankingId: 'rajesh_s', netbankingPassword: 'Sample#Net1', registeredMobile: '+91 01234 56781', upiIds: 'rajesh@sbi' },
+    {
+      ...base, id: 's-b-papa-sbi', ownerId: 's-papa', createdBy: 's-papa', bank: 'State Bank of India', holder: 'Rajesh Kumar Sharma', type: 'savings', accountNumber: '000012345678', ifsc: 'SBIN0001234', branch: 'Lajpat Nagar', nominee: 'Sunita Sharma', registeredMobile: '+91 01234 56781', upiIds: 'rajesh@sbi',
+      credentials: [
+        {
+          id: 's-cr-sbi-nb', label: 'Net banking', username: 'rajesh_s',
+          secrets: [
+            { id: 's-cr-sbi-login', label: 'Login password', value: 'Sample#Net1' },
+            { id: 's-cr-sbi-profile', label: 'Profile password', value: 'Sample#Prof1' },
+            { id: 's-cr-sbi-txn', label: 'Transaction password', value: 'Sample#Txn1' },
+          ],
+        },
+        { id: 's-cr-sbi-app', label: 'Mobile app', username: 'rajesh_s', secrets: [{ id: 's-cr-sbi-mpin', label: 'MPIN', value: '000000' }] },
+      ],
+    },
     { ...base, id: 's-b-papa-hdfc', ownerId: 's-papa', createdBy: 's-papa', bank: 'HDFC Bank', type: 'savings', accountNumber: '00001234567890', ifsc: 'HDFC0001234', nominee: 'Ananya Sharma' },
     { ...base, id: 's-b-mummy-pnb', ownerId: 's-mummy', createdBy: 's-mummy', bank: 'Punjab National Bank', type: 'savings', accountNumber: '0000123400012345', ifsc: 'PUNB0123400', nominee: 'Rajesh Kumar Sharma' },
     { ...base, id: 's-b-ananya-hdfc', ownerId: 's-ananya', bank: 'HDFC Bank', type: 'salary', accountNumber: '00009876543210', ifsc: 'HDFC0005678', netbankingId: 'ananya_s', netbankingPassword: 'Sample#Net2' },
@@ -131,6 +160,11 @@ export function buildSampleFamily(now: Date = new Date()): Family {
     c('s-c-ananya-hdfc-debit', { type: 'debit', bank: 'HDFC Bank', ownerId: 's-ananya', nameOnCard: 'ANANYA SHARMA', number: '4000056655665556', network: 'visa', expiry: '05/30', linkedAccountId: 's-b-ananya-hdfc' }),
     c('s-c-ananya-hdfc-credit', { type: 'credit', bank: 'HDFC Bank', nickname: 'Shopping card', ownerId: 's-ananya', nameOnCard: 'ANANYA SHARMA', number: '4012888888881881', network: 'visa', expiry: '12/27', creditLimit: 150000, statementDay: dayIn(-16), dueDay: dayIn(4) }),
     c('s-c-ananya-icici-credit', { type: 'credit', bank: 'ICICI Bank', nickname: 'Fuel card', ownerId: 's-ananya', nameOnCard: 'ANANYA SHARMA', number: '5105105105105100', network: 'mastercard', expiry: '09/28', creditLimit: 80000, statementDay: 20, dueDay: 8 }),
+  ];
+
+  const vehicles: Vehicle[] = [
+    { ...base, id: 's-v-car', name: 'Swift', kind: 'car', number: 'XX01AB1234', registeredTo: 's-papa', createdBy: 's-papa' },
+    { ...base, id: 's-v-scooter', name: 'Activa', kind: 'scooter', number: 'XX01CD5678', registeredTo: 's-ananya' },
   ];
 
   const notes: SecureNote[] = [
@@ -162,7 +196,7 @@ export function buildSampleFamily(now: Date = new Date()): Family {
     createdAt: t0,
     createdBy: 'sample',
     personalSharing: 'family',
-    members, documents, logins, bankAccounts, cards, notes, tasks, contacts,
+    members, documents, logins, bankAccounts, cards, notes, vehicles, tasks, contacts,
     activity: [
       // Newest first, as the app keeps it.
       { id: 's-a-3', at: now.getTime() - 3_600_000, by: 's-ananya', kind: 'added', text: 'added the family health policy' },

@@ -4,9 +4,11 @@
  */
 import { displayName, findMember, visibleTo } from './access';
 import { getCategory, getTemplate, type Template } from './templates';
+import { findBank } from './banks';
 import type { Family, ID } from './types';
+import { formatPlate, vehicleKindLabel, vehiclesOf } from './vehicles';
 
-export type HitKind = 'person' | 'doc' | 'login' | 'bank' | 'card' | 'note' | 'task' | 'contact' | 'template';
+export type HitKind = 'person' | 'doc' | 'login' | 'bank' | 'card' | 'note' | 'vehicle' | 'task' | 'contact' | 'template';
 
 export interface SearchEntry {
   kind: HitKind;
@@ -148,13 +150,20 @@ export function buildIndex(family: Family, viewerId: ID): SearchEntry[] {
   for (const account of visibleTo(family, viewerId, family.bankAccounts)) {
     entries.push({
       kind: 'bank', id: account.id, title: `${account.bank} account`, subtitle: nameOf(account.ownerId),
-      keywords: ['bank', 'account', 'khata', account.ifsc ?? '', account.type],
+      keywords: ['bank', 'account', 'khata', account.ifsc ?? '', account.type, findBank(account.bank)?.short ?? '', ...(findBank(account.bank)?.aka ?? [])],
     });
   }
   for (const card of visibleTo(family, viewerId, family.cards)) {
     entries.push({
       kind: 'card', id: card.id, title: `${card.bank} ${card.nickname ?? card.type + ' card'}`, subtitle: nameOf(card.ownerId),
-      keywords: ['card', card.type, card.network, 'credit', 'debit'],
+      keywords: ['card', card.type, card.network, 'credit', 'debit', findBank(card.bank)?.short ?? ''],
+    });
+  }
+  for (const vehicle of vehiclesOf(family)) {
+    const plate = vehicle.number ?? '';
+    entries.push({
+      kind: 'vehicle', id: vehicle.id, title: vehicle.name, subtitle: plate ? formatPlate(plate) : vehicleKindLabel(vehicle.kind),
+      keywords: ['vehicle', 'gaadi', 'gadi', vehicle.kind, vehicleKindLabel(vehicle.kind), plate, plate.slice(-4)],
     });
   }
   for (const note of visibleTo(family, viewerId, family.notes)) {

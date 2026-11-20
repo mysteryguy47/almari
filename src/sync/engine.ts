@@ -15,7 +15,7 @@ import {
 import type { CloudApi, PullRow, PushRow } from './api';
 import { ikContext, recordContext } from './contexts';
 import { deepEqual, mergeRecords } from './merge';
-import { applyRecord, desiredVisibility, readRecord, type Change, type RecordKind } from './model';
+import { applyRecord, desiredVisibility, NEWER_KINDS, readRecord, type Change, type RecordKind } from './model';
 import type { BaseEntry, FamilySync, OutboxEntry } from './types';
 
 export interface Replica {
@@ -55,6 +55,32 @@ export function tick(): number {
 function filesOf(data: unknown): FileRef[] {
   const files = (data as Partial<DocItem> | null)?.files;
   return Array.isArray(files) ? files : [];
+}
+
+/** A file another document of the family still uses (its pages moved there when duplicates were merged). */
+function usedElsewhere(family: Family | undefined, fileId: string, docId: string): boolean {
+  return !!family?.documents.some((d) => d.id !== docId && d.files.some((f) => f.id === fileId));
+}
+
+/**
+ * Record kinds this server turned away because its database predates them.
+ * Those changes wait on this device (nothing is lost) and go once the server
+ * is updated; everything else keeps syncing meanwhile. Retried each app start.
+ */
+const refusedKinds = new Set<RecordKind>();
+
+export function kindsRefusedByServer(): RecordKind[] {
+  return [...refusedKinds];
+}
+
+/** For tests: forget which kinds the server refused. */
+export function resetRefusedKinds(): void {
+  refusedKinds.clear();
+}
+
+function isKindRefusal(e: unknown): boolean {
+  const text = `${(e as { message?: string })?.message ?? ''} ${(e as { details?: string })?.details ?? ''} ${(e as { code?: string })?.code ?? ''}`;
+  return /records_kind_check/.test(text) || (/23514/.test(text) && /kind/.test(text));
 }
 
 function titleOf(kind: RecordKind, data: unknown): string {
@@ -172,7 +198,10 @@ function receive(replica: Replica, familyId: string, row: PullRow, notices: Sync
       delete s.outbox[row.id];
       delete s.locked[row.id];
     });
-    if (files) for (const f of filesOf(gone)) void files.forget(f.id).catch(() => undefined);
+    if (files) {
+      const family = replica.family(familyId);
+      for (const f of filesOf(gone)) if (!usedElsewhere(family, f.id, row.id)) void files.forget(f.id).catch(() => undefined);
+    }
     return;
   }
 
@@ -244,7 +273,8 @@ export async function push(api: CloudApi, replica: Replica, familyId: string, no
   for (let round = 0; round < 50; round++) {
     const sync = replica.sync(familyId);
     if (!sync) return;
-    const ids = Object.keys(sync.outbox).slice(0, 100);
+    // Kinds the server refused wait; they must not take the batch's places from the rest.
+    const ids = Object.keys(sync.outbox).filter((id) => !refusedKinds.has(sync.outbox[id].kind)).slice(0, 100);
     if (ids.length === 0) return;
     const sent = new Map<string, { at: number; entry: OutboxEntry; ik?: string; visibleTo: string | null }>();
     const rows: PushRow[] = [];
@@ -263,7 +293,18 @@ export async function push(api: CloudApi, replica: Replica, familyId: string, no
     }
     if (rows.length === 0) return;
 
-    const results = await api.push(familyId, rows);
+    let results: Awaited<ReturnType<CloudApi['push']>>;
+    try {
+      results = await api.push(familyId, rows);
+    } catch (e) {
+      // An older server refuses a whole batch over one newer kind: hold those back and send the rest.
+      const newer = [...sent.values()].map((x) => x.entry.kind).filter((k) => NEWER_KINDS.has(k) && !refusedKinds.has(k));
+      if (newer.length && isKindRefusal(e)) {
+        newer.forEach((k) => refusedKinds.add(k));
+        continue;
+      }
+      throw e;
+    }
     let conflicts = 0;
     for (const res of results) {
       const item = sent.get(res.id);
@@ -286,7 +327,8 @@ export async function push(api: CloudApi, replica: Replica, familyId: string, no
         // Files no longer referenced leave the server too.
         if (item.entry.kind === 'document') {
           const keep = new Set(filesOf(item.entry.data).map((f) => f.id));
-          const removed = filesOf(before?.data).map((f) => f.id).filter((id) => !keep.has(id));
+          const family = replica.family(familyId);
+          const removed = filesOf(before?.data).map((f) => f.id).filter((id) => !keep.has(id) && !usedElsewhere(family, id, res.id));
           if (removed.length) {
             await api.removeFiles(familyId, removed).catch(() => undefined);
             if (files) for (const id of removed) await files.forget(id).catch(() => undefined);

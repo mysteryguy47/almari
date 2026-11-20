@@ -1,5 +1,5 @@
 import { Image } from 'expo-image';
-import { Redirect, useLocalSearchParams } from 'expo-router';
+import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState, type ComponentRef } from 'react';
 import { Platform, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { GestureDetector, usePanGesture } from 'react-native-gesture-handler';
@@ -13,10 +13,17 @@ import { useFileUrl } from '@/components/DocThumb';
 import { Card, Screen } from '@/components/Layout';
 import { T } from '@/components/Text';
 import { aadhaarMaskRect, type Rect } from '@/domain/extract';
+import type { FileRef } from '@/domain/types';
+import { docVersions, MAX_VERSIONS } from '@/domain/versions';
+import { pickedFromResult } from '@/lib/crop';
+import { initCrypto, randomKey, toB64 } from '@/lib/crypto';
+import { haptic } from '@/lib/device';
 import { imageSize, maskImage } from '@/lib/image-ops';
 import { OCR_AVAILABLE, recognize } from '@/lib/ocr';
-import { shareResult } from '@/store/files';
+import { useApp } from '@/store/app-store';
+import { saveFile, shareResult } from '@/store/files';
 import { useCtx } from '@/store/hooks';
+import { newId } from '@/store/secrets';
 import { toast } from '@/store/ui-store';
 import { MAX_WIDTH, space } from '@/theme/tokens';
 
@@ -37,6 +44,10 @@ export default function MaskAadhaar() {
   const [status, setStatus] = useState<'idle' | 'finding' | 'found' | 'manual'>('idle');
   const [busy, setBusy] = useState(false);
   const [made, setMade] = useState<{ key: string; uri: string; blob?: Blob }>();
+  const [kept, setKept] = useState<string>();
+  const [keeping, setKeeping] = useState(false);
+  const addDocVersion = useApp((s) => s.addDocVersion);
+  const addVersionPages = useApp((s) => s.addVersionPages);
   const shotRef = useRef<ComponentRef<typeof View>>(null);
   const tx = useSharedValue(0);
   const ty = useSharedValue(0);
@@ -119,6 +130,34 @@ export default function MaskAadhaar() {
     if (!ok) toast('Could not open the share sheet', { tone: 'warn' });
   };
 
+  /** The masked image as a page of the "Masked" version: the front goes in first, the back joins it. */
+  const keep = async () => {
+    if (!ready || !ctx || kept === ready.key) return;
+    const masked = docVersions(doc).find((v) => v.label.toLowerCase() === 'masked');
+    if (!masked && docVersions(doc).length >= MAX_VERSIONS) return toast(`Up to ${MAX_VERSIONS} versions of one paper. Remove an old one first.`, { tone: 'warn' });
+    setKeeping(true);
+    try {
+      const side = file.name.replace(/\.[a-z0-9]+$/i, '');
+      const picked = await pickedFromResult(ready, `${side}-masked.jpg`);
+      const ref: FileRef = { id: newId(), name: picked.name, mime: 'image/jpeg', size: picked.size ?? 0, kind: 'image' };
+      if (!ctx.family.isSample) {
+        await initCrypto();
+        ref.key = toB64(randomKey());
+        ref.familyId = ctx.family.id;
+      }
+      await saveFile(ref, picked);
+      if (masked) addVersionPages(doc.id, masked.id, [ref]);
+      else addDocVersion(doc.id, 'Masked', [ref]);
+      setKept(ready.key);
+      haptic.success();
+      toast(masked ? 'Added to the Masked version' : 'Kept as the Masked version. Share it any time from the paper.', { tone: 'success' });
+    } catch (e) {
+      toast(`Could not keep it: ${(e as Error).message}`, { tone: 'warn' });
+    } finally {
+      setKeeping(false);
+    }
+  };
+
   const make = async () => {
     if (!url || !rect || !size) return;
     setBusy(true);
@@ -144,7 +183,16 @@ export default function MaskAadhaar() {
       subtitle={doc.title}
       footer={
         ready ? (
-          <Button label="Share masked copy" icon="Share2" onPress={share} testID="mask-share" />
+          <View style={styles.footer}>
+            <View style={styles.flex}><Button label="Share" icon="Share2" onPress={share} testID="mask-share" /></View>
+            <View style={styles.flex}>
+              {kept === ready.key ? (
+                <Button label="Open the paper" icon="Layers" variant="secondary" onPress={() => router.back()} testID="mask-open" />
+              ) : (
+                <Button label="Keep as a version" icon="Layers" variant="secondary" onPress={keep} loading={keeping} testID="mask-keep" />
+              )}
+            </View>
+          </View>
         ) : (
           <Button label="Make masked copy" icon="EyeOff" onPress={make} loading={busy} disabled={!rect} testID="mask-make" />
         )
@@ -182,13 +230,15 @@ export default function MaskAadhaar() {
           <Chip label="Taller" icon="Plus" onPress={() => resize(1, 1.15)} testID="mask-taller" />
         </View>
       </View>
-      <T variant="small" color="ink3">The original stays as it is in the almari. Only the shared copy is masked. The full e-Aadhaar letter prints the number more than once; for that, download the masked e-Aadhaar from UIDAI.</T>
+      <T variant="small" color="ink3">The original stays as it is. Keep the masked copy as a version and it is ready to share next time. The full e-Aadhaar letter prints the number more than once; for that, download the masked e-Aadhaar from UIDAI.</T>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
   lead: { marginBottom: space.lg },
+  flex: { flex: 1 },
+  footer: { flexDirection: 'row', gap: space.md },
   bar: { position: 'absolute', backgroundColor: '#000000' },
   sizeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm, marginVertical: space.lg },
   pair: { flexDirection: 'row', gap: space.sm },

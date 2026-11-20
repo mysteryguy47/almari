@@ -1,8 +1,8 @@
 /**
  * How a family becomes records on the server, and back.
  *
- * Every member, document, login, bank account, card, note, task, contact and
- * activity entry is one record, keyed by its own id. The family's own fields
+ * Every member, document, login, bank account, card, note, vehicle, task,
+ * contact and activity entry is one record, keyed by its own id. The family's own fields
  * (name, sharing setting, removal requests, dismissed nudges) are one record
  * with the id "family", and each member's reminder settings are "prefs:<id>".
  *
@@ -11,12 +11,15 @@
 import type { Family, ID, Ownable, PersonalSharing, RemovalRequest, ReminderPrefs } from '@/domain/types';
 
 export type RecordKind =
-  | 'family' | 'member' | 'document' | 'login' | 'bank' | 'card' | 'note' | 'task' | 'contact' | 'activity' | 'prefs';
+  | 'family' | 'member' | 'document' | 'login' | 'bank' | 'card' | 'note' | 'vehicle' | 'task' | 'contact' | 'activity' | 'prefs';
+
+/** Kinds added after the first server schema (Nov 2026). A server without them refuses them; see engine.push. */
+export const NEWER_KINDS: ReadonlySet<RecordKind> = new Set(['vehicle']);
 
 export const FAMILY_RECORD_ID = 'family';
 const PREFS_PREFIX = 'prefs:';
 
-type ListKey = 'members' | 'documents' | 'logins' | 'bankAccounts' | 'cards' | 'notes' | 'tasks' | 'contacts';
+type ListKey = 'members' | 'documents' | 'logins' | 'bankAccounts' | 'cards' | 'notes' | 'vehicles' | 'tasks' | 'contacts';
 
 const LISTS: readonly { key: ListKey; kind: RecordKind }[] = [
   { key: 'members', kind: 'member' },
@@ -25,6 +28,7 @@ const LISTS: readonly { key: ListKey; kind: RecordKind }[] = [
   { key: 'bankAccounts', kind: 'bank' },
   { key: 'cards', kind: 'card' },
   { key: 'notes', kind: 'note' },
+  { key: 'vehicles', kind: 'vehicle' },
   { key: 'tasks', kind: 'task' },
   { key: 'contacts', kind: 'contact' },
 ];
@@ -32,7 +36,7 @@ const LISTS: readonly { key: ListKey; kind: RecordKind }[] = [
 const LIST_OF: Partial<Record<RecordKind, ListKey>> = Object.fromEntries(LISTS.map((l) => [l.kind, l.key]));
 
 /** Kinds that carry the "who can see it" fields (ownerId, onlyMe). */
-export const OWNABLE_KINDS: ReadonlySet<RecordKind> = new Set(['document', 'login', 'bank', 'card', 'note']);
+export const OWNABLE_KINDS: ReadonlySet<RecordKind> = new Set(['document', 'login', 'bank', 'card', 'note', 'vehicle']);
 
 export const MAX_ACTIVITY = 300;
 
@@ -61,7 +65,7 @@ export function familyFields(family: Family): FamilyFields {
 export function emptyFamily(id: ID, name = '', createdBy: ID = ''): Family {
   return {
     id, name, createdAt: Date.now(), createdBy, personalSharing: 'family',
-    members: [], documents: [], logins: [], bankAccounts: [], cards: [], notes: [], tasks: [], contacts: [],
+    members: [], documents: [], logins: [], bankAccounts: [], cards: [], notes: [], vehicles: [], tasks: [], contacts: [],
     activity: [], reminderPrefs: {}, removalRequests: [], dismissedNudges: [],
   };
 }
@@ -97,8 +101,8 @@ export function diffFamily(prev: Family | undefined, next: Family): Change[] {
 
   for (const { key, kind } of LISTS) {
     const before = prev?.[key] as { id: ID }[] | undefined;
-    const after = next[key] as { id: ID }[];
-    if (before === after) continue;
+    const after = (next[key] ?? []) as { id: ID }[];
+    if (before === next[key]) continue;
     const old = new Map((before ?? []).map((i) => [i.id, i]));
     for (const item of after) {
       if (old.get(item.id) !== item) changes.push({ id: item.id, kind, data: item });
@@ -161,6 +165,8 @@ export function applyRecord(family: Family, kind: RecordKind, id: string, data: 
   }
   const key = LIST_OF[kind];
   if (!key) return;
+  // Families saved before a list existed (vehicles) get it on first use.
+  if (!family[key]) (family as unknown as Record<string, unknown[]>)[key] = [];
   const list = family[key] as { id: ID }[];
   const index = list.findIndex((i) => i.id === id);
   if (!data) {
@@ -178,7 +184,7 @@ export function readRecord(family: Family, kind: RecordKind, id: string): unknow
   if (kind === 'prefs') return family.reminderPrefs[id.startsWith(PREFS_PREFIX) ? id.slice(PREFS_PREFIX.length) : id];
   if (kind === 'activity') return family.activity.find((a) => a.id === id);
   const key = LIST_OF[kind];
-  return key ? (family[key] as { id: ID }[]).find((i) => i.id === id) : undefined;
+  return key ? ((family[key] ?? []) as { id: ID }[]).find((i) => i.id === id) : undefined;
 }
 
 /**

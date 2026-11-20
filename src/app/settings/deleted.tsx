@@ -33,6 +33,7 @@ export default function RecentlyDeleted() {
     take('bankAccounts', f.bankAccounts, (d: { bank: string }) => `${d.bank} account`);
     take('cards', f.cards, (d: { bank: string }) => `${d.bank} card`);
     take('notes', f.notes, (d: { title: string }) => d.title);
+    take('vehicles', f.vehicles ?? [], (d: { name: string }) => d.name);
     return out.sort((a, b) => b.deletedAt - a.deletedAt);
   }, [ctx]);
   if (!ctx) return <Redirect href="/" />;

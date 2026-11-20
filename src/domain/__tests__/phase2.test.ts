@@ -113,7 +113,7 @@ describe('situation packs', () => {
     const sample = buildSampleFamily(NOW);
     const vehicle = getPack('vehicle')!;
     const { results, missingRequired } = evaluatePack(vehicle, sample, SAMPLE_VIEWER_ID, 's-papa');
-    expect(results.map((r) => r.docs[0]?.title)).toEqual(["Papa's driving licence", 'Car RC', 'Car insurance', 'Car PUC']);
+    expect(results.map((r) => r.docs[0]?.title)).toEqual(["Papa's driving licence", 'Swift RC', 'Swift insurance', 'Swift PUC']);
     expect(missingRequired).toBe(0);
     const bank = evaluatePack(getPack('bank-kyc')!, sample, SAMPLE_VIEWER_ID, 's-kabir');
     expect(bank.missingRequired).toBe(2); // Kabir has no PAN, no photo

@@ -12,7 +12,7 @@ import type { EditHistory } from '@/domain/types';
 type Obj = Record<string, unknown>;
 
 /** Fields that hold sets, merged item by item rather than replaced whole. */
-const SET_FIELDS = new Set(['mutedBy', 'dismissedNudges', 'assignees', 'files', 'removalRequests']);
+const SET_FIELDS = new Set(['mutedBy', 'dismissedNudges', 'assignees', 'files', 'removalRequests', 'versions', 'credentials', 'extraSecrets']);
 /** Bookkeeping fields: never a conflict of their own. */
 const QUIET_FIELDS = new Set(['updatedAt', 'history']);
 const DELETE_FIELDS = new Set(['deletedAt', 'deletedBy']);

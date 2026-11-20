@@ -16,7 +16,7 @@ describe('family ↔ records', () => {
       for (const r of allRecords(family)) applyRecord(draft, r.kind, r.id, JSON.parse(JSON.stringify(r.data)));
     });
     expect(rebuilt.name).toBe(family.name);
-    for (const key of ['members', 'documents', 'logins', 'bankAccounts', 'cards', 'notes', 'tasks', 'contacts'] as const) {
+    for (const key of ['members', 'documents', 'logins', 'bankAccounts', 'cards', 'notes', 'vehicles', 'tasks', 'contacts'] as const) {
       const byId = (list: { id: string }[]) => [...list].sort((a, b) => a.id.localeCompare(b.id));
       expect(byId(rebuilt[key] as { id: string }[])).toEqual(byId(family[key] as { id: string }[]));
     }

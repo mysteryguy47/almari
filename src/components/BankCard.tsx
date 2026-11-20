@@ -1,6 +1,7 @@
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { interpolate, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 
+import { findBank } from '@/domain/banks';
 import { daysUntil, relativeDays } from '@/domain/dates';
 import { CARD_TYPE_LABELS, formatRupees, maskTail, NETWORK_LABELS, ordinal } from '@/domain/money';
 import { nextMonthlyDate } from '@/domain/reminders';
@@ -8,6 +9,7 @@ import type { CardItem } from '@/domain/types';
 import { haptic } from '@/lib/device';
 import { radius, space } from '@/theme/tokens';
 
+import { BankMark } from './Marks';
 import { T } from './Text';
 
 /** Deep, quiet card colours, picked from the bank name so a bank keeps its colour. */
@@ -15,7 +17,16 @@ const CARD_COLOURS = ['#1E3A32', '#262B4F', '#4A2620', '#3A3020', '#2A2A2A', '#2
 const INK = '#FBF6EC';
 const INK_SOFT = 'rgba(251, 246, 236, 0.72)';
 
+/** A deep shade of the bank's own colour, so an SBI card reads blue and an ICICI card maroon. */
+function deepen(hex: string, keep = 0.62): string {
+  const n = parseInt(hex.slice(1), 16);
+  const ch = (shift: number) => Math.round(((n >> shift) & 255) * keep).toString(16).padStart(2, '0');
+  return `#${ch(16)}${ch(8)}${ch(0)}`;
+}
+
 export function cardColour(bank: string): string {
+  const known = findBank(bank);
+  if (known?.color) return deepen(known.color);
   let hash = 0;
   for (let i = 0; i < bank.length; i++) hash = (hash * 31 + bank.charCodeAt(i)) >>> 0;
   return CARD_COLOURS[hash % CARD_COLOURS.length];
@@ -49,7 +60,10 @@ export function BankCard({ card, accountLabel, onPress, testID }: { card: CardIt
         <View style={styles.aspect}>
           <Animated.View style={[styles.face, { backgroundColor: bg }, front]}>
             <View style={styles.top}>
-              <T variant="bodyStrong" style={{ color: INK }} numberOfLines={1}>{card.bank}</T>
+              <View style={styles.bankName}>
+                <BankMark bank={card.bank} size={28} />
+                <T variant="bodyStrong" style={[styles.flex, { color: INK }]} numberOfLines={1}>{card.bank}</T>
+              </View>
               <T variant="label" style={{ color: INK_SOFT }}>{card.type === 'credit' ? 'Credit' : card.type === 'debit' ? 'Debit' : CARD_TYPE_LABELS[card.type]}</T>
             </View>
             <View style={styles.chip} />
@@ -104,6 +118,7 @@ const styles = StyleSheet.create({
   },
   backFace: { justifyContent: 'center', gap: space.sm },
   top: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: space.md },
+  bankName: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: space.sm },
   chip: { width: 40, height: 30, borderRadius: 6, backgroundColor: '#C9A86A', opacity: 0.9 },
   bottom: { flexDirection: 'row', alignItems: 'flex-end', gap: space.md },
   backRow: { flexDirection: 'row', gap: space.lg, marginVertical: space.sm },

@@ -5,12 +5,16 @@ import { StyleSheet, View } from 'react-native';
 
 import { Chip } from '@/components/Bits';
 import { Button } from '@/components/Button';
+import { Cropper } from '@/components/Cropper';
 import { useFileUrl } from '@/components/DocThumb';
 import { TextField } from '@/components/Fields';
 import { Card, Screen, Section } from '@/components/Layout';
 import { T } from '@/components/Text';
 import { EXPORT_PRESETS, exportFileName, type ExportTarget } from '@/domain/form-export';
 import { digitsOnly, formatBytes } from '@/domain/validation';
+import { getTemplate } from '@/domain/templates';
+import type { Edited } from '@/lib/crop';
+import { haptic } from '@/lib/device';
 import { exportForForm, type ExportResult } from '@/lib/image-ops';
 import { shareResult } from '@/store/files';
 import { useCtx } from '@/store/hooks';
@@ -30,11 +34,13 @@ export default function FormExport() {
   const [custom, setCustom] = useState({ width: '', height: '', kb: '' });
   const [result, setResult] = useState<ExportResult>();
   const [busy, setBusy] = useState(false);
+  const [cropOpen, setCropOpen] = useState(false);
+  const [cropped, setCropped] = useState<Edited>();
 
   if (!ctx) return <Redirect href="/" />;
   if (!doc || !file || file.kind !== 'image') {
     return (
-      <Screen title="Resize for a form">
+      <Screen title="Crop or resize">
         <Card><T variant="body" color="ink2">Resizing works on photos. Add a photo to this paper first.</T></Card>
       </Screen>
     );
@@ -47,12 +53,13 @@ export default function FormExport() {
         : undefined
       : EXPORT_PRESETS.find((p) => p.id === presetId);
 
+  const source = cropped?.uri ?? url;
   const make = async () => {
-    if (!url || !target) return;
+    if (!source || !target) return;
     setBusy(true);
     setResult(undefined);
     try {
-      setResult(await exportForForm(url, target));
+      setResult(await exportForForm(source, target));
     } catch (e) {
       toast(`Could not resize: ${(e as Error).message}`, { tone: 'warn' });
     } finally {
@@ -67,8 +74,35 @@ export default function FormExport() {
   };
 
   return (
-    <Screen title="Resize for a form" subtitle={doc.title} testID="form-export">
-      <T variant="body" color="ink2" style={styles.lead}>Exam, passport and job portals reject files for size. Pick what the form asks for.</T>
+    <Screen title="Crop or resize" subtitle={doc.title} testID="form-export">
+      <T variant="body" color="ink2" style={styles.lead}>Exam, passport and job portals reject files for size and shape. Crop it if you need to, then pick what the form asks for.</T>
+      <Card style={styles.cropCard}>
+        {source ? <Image source={{ uri: source }} style={styles.cropThumb} contentFit="contain" accessibilityLabel={cropped ? 'Cropped photo' : 'Photo'} /> : null}
+        <View style={styles.flex}>
+          <T variant="bodyStrong">{cropped ? `Cropped to ${cropped.width} × ${cropped.height} px` : 'The whole photo'}</T>
+          <T variant="small" color="ink2">{cropped ? 'Sizes below are made from the cropped photo.' : 'Free, square, portrait or landscape.'}</T>
+          <View style={styles.cropButtons}>
+            <Button label={cropped ? 'Crop again' : 'Crop'} icon="Crop" variant="secondary" size="md" full={false} onPress={() => setCropOpen(true)} disabled={!url} testID="export-crop" />
+            {cropped ? <Button label="Share" icon="Share2" variant="ghost" size="md" full={false} onPress={() => void shareResult(cropped, cropped.name, 'image/jpeg')} testID="export-share-crop" /> : null}
+            {cropped ? <Button label="Undo" variant="ghost" size="md" full={false} onPress={() => { setCropped(undefined); setResult(undefined); }} testID="export-uncrop" /> : null}
+          </View>
+        </View>
+      </Card>
+      <Cropper
+        visible={cropOpen}
+        uri={cropped?.uri ?? url ?? undefined}
+        name={file.name}
+        cardShaped={getTemplate(doc.templateId).shape === 'card'}
+        onClose={() => setCropOpen(false)}
+        onDone={(r) => {
+          setCropOpen(false);
+          if (!r) return;
+          haptic.success();
+          setCropped(r);
+          setResult(undefined);
+        }}
+        testID="cropper"
+      />
       <Section title="The form asks for">
         <View style={styles.chips}>
           {EXPORT_PRESETS.map((p) => <Chip key={p.id} testID={`preset-${p.id}`} label={p.label} selected={presetId === p.id} onPress={() => { setPresetId(p.id); setResult(undefined); }} />)}
@@ -105,4 +139,7 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', gap: space.sm },
   result: { gap: space.md, marginTop: space.lg, alignItems: 'stretch' },
   note: { marginTop: space.lg },
+  cropCard: { flexDirection: 'row', gap: space.md, alignItems: 'center', marginBottom: space.xl },
+  cropThumb: { width: 84, height: 84, borderRadius: 10 },
+  cropButtons: { flexDirection: 'row', gap: space.sm, marginTop: space.sm },
 });

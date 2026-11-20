@@ -18,6 +18,7 @@ const KIND: Record<HitKind, { icon: IconName; tint: Tint; href: (id: string) => 
   login: { icon: 'KeyRound', tint: 'stamp', href: (id) => `/login/${id}`, label: 'Login' },
   bank: { icon: 'Landmark', tint: 'haldi', href: (id) => `/bank/${id}`, label: 'Account' },
   card: { icon: 'CreditCard', tint: 'inland', href: (id) => `/card/${id}`, label: 'Card' },
+  vehicle: { icon: 'Car', tint: 'inland', href: (id) => `/vehicle/${id}`, label: 'Vehicle' },
   note: { icon: 'StickyNote', tint: 'stamp', href: (id) => `/note/${id}`, label: 'Note' },
   task: { icon: 'ListTodo', tint: 'almari', href: (id) => `/task/${id}`, label: 'Task' },
   contact: { icon: 'Phone', tint: 'haldi', href: (id) => `/contact/${id}`, label: 'Number' },

@@ -30,7 +30,7 @@ export const CATEGORIES: readonly Category[] = [
   { id: 'education', name: 'Education', scope: 'personal', icon: 'GraduationCap', tint: 'stamp', synonyms: ['school', 'college', 'padhai', 'marksheet'] },
   { id: 'work', name: 'Work and income', scope: 'personal', icon: 'Briefcase', tint: 'lifafa', synonyms: ['job', 'naukri', 'salary', 'office'] },
   { id: 'health', name: 'Health', scope: 'personal', icon: 'HeartPulse', tint: 'sindoor', synonyms: ['medical', 'hospital', 'doctor', 'dawai', 'mediclaim'] },
-  { id: 'money', name: 'Money', scope: 'personal', icon: 'PiggyBank', tint: 'haldi', synonyms: ['bank', 'paisa', 'investment', 'bachat', 'savings'] },
+  { id: 'money', name: 'Bank and money', scope: 'personal', icon: 'PiggyBank', tint: 'haldi', synonyms: ['bank', 'banking', 'paisa', 'investment', 'bachat', 'savings', 'cheque', 'passbook'] },
   { id: 'travel', name: 'Travel', scope: 'personal', icon: 'Plane', tint: 'inland', synonyms: ['abroad', 'videsh', 'trip', 'yatra'] },
   { id: 'home', name: 'Home and property', scope: 'common', icon: 'House', tint: 'inland', synonyms: ['ghar', 'makaan', 'flat', 'property', 'plot'] },
   { id: 'vehicles', name: 'Vehicles', scope: 'common', icon: 'Car', tint: 'inland', synonyms: ['gaadi', 'gadi', 'car', 'scooter', 'bike', 'motor'] },
@@ -69,6 +69,19 @@ export interface Template {
   profileId?: IdKind;
   /** Has a nominee worth recording (deposits, policies, investments). */
   nominee?: boolean;
+  /**
+   * A person has only one of these (Aadhaar, PAN, a Class 10 marksheet).
+   * Adding it again adds another version (masked, PVC card, attested copy) to the same document.
+   */
+  unique?: boolean;
+  /** Belongs to one vehicle (RC, insurance, a service bill): saved under that vehicle. */
+  perVehicle?: boolean;
+  /** Belongs to one bank account (cancelled cheque, passbook). */
+  perAccount?: boolean;
+  /** The short name after a vehicle's or a bank's name: "Swift RC", "SBI cancelled cheque". */
+  short?: string;
+  /** Versions people usually keep of this paper, offered as quick labels. */
+  versionLabels?: string[];
   synonyms?: string[];
 }
 
@@ -87,48 +100,51 @@ const RENEWAL = { label: 'Renewal due' };
 export const TEMPLATES: readonly Template[] = [
   // ------------------------------------------------ Identity
   t('aadhaar', 'Aadhaar', 'identity', 'FingerprintPattern', 'card', {
-    sides: 2, number: { label: 'Aadhaar number', kind: 'aadhaar' }, profileId: 'aadhaar',
+    sides: 2, number: { label: 'Aadhaar number', kind: 'aadhaar' }, profileId: 'aadhaar', unique: true,
+    versionLabels: ['Masked', 'e-Aadhaar PDF', 'PVC card', 'Self-attested copy', 'Old address'],
     synonyms: ['adhar', 'aadhar', 'adhaar', 'uid', 'uidai', 'e-aadhaar', 'aadhaar card'],
   }),
   t('pan', 'PAN card', 'identity', 'IdCard', 'card', {
-    number: { label: 'PAN', kind: 'pan' }, profileId: 'pan', synonyms: ['pan', 'pen card', 'pancard', 'income tax card'],
+    number: { label: 'PAN', kind: 'pan' }, profileId: 'pan', unique: true, versionLabels: ['e-PAN PDF', 'Self-attested copy', 'Old card'], synonyms: ['pan', 'pen card', 'pancard', 'income tax card'],
   }),
   t('voter-id', 'Voter ID', 'identity', 'IdCard', 'card', {
-    sides: 2, number: { label: 'EPIC number', kind: 'voter' }, profileId: 'voter',
+    sides: 2, number: { label: 'EPIC number', kind: 'voter' }, profileId: 'voter', unique: true, versionLabels: ['e-EPIC PDF', 'Self-attested copy', 'Old card'],
     synonyms: ['epic', 'election card', 'voter card', 'chunav'],
   }),
   t('driving-licence', 'Driving licence', 'identity', 'Car', 'card', {
-    sides: 2, number: { label: 'Licence number', kind: 'dl' }, profileId: 'dl', expiry: VALID_TILL, issueDate: true,
+    sides: 2, number: { label: 'Licence number', kind: 'dl' }, profileId: 'dl', expiry: VALID_TILL, issueDate: true, unique: true,
+    versionLabels: ['DigiLocker copy', 'Self-attested copy', 'Old licence'],
     synonyms: ['dl', 'license', 'licence', 'driving license'],
   }),
   t('passport', 'Passport', 'identity', 'BookOpen', 'card', {
-    number: { label: 'Passport number', kind: 'passport' }, profileId: 'passport', issueDate: true,
+    number: { label: 'Passport number', kind: 'passport' }, profileId: 'passport', issueDate: true, unique: true,
+    versionLabels: ['All pages', 'Self-attested copy', 'Old passport'],
     expiry: { label: 'Valid till', rule: { months: [9, 3] } }, synonyms: ['passport'],
   }),
   t('birth-certificate', 'Birth certificate', 'identity', 'Baby', 'a4', {
-    number: { label: 'Registration number' }, synonyms: ['janam praman patra', 'dob certificate'],
+    number: { label: 'Registration number' }, unique: true, versionLabels: ['Original', 'Attested copy', 'Translation'], synonyms: ['janam praman patra', 'dob certificate'],
   }),
-  t('oci-card', 'OCI card', 'identity', 'Globe', 'a4', { number: { label: 'OCI number' }, synonyms: ['overseas citizen'] }),
+  t('oci-card', 'OCI card', 'identity', 'Globe', 'a4', { number: { label: 'OCI number' }, unique: true, synonyms: ['overseas citizen'] }),
 
   // ------------------------------------------------ Photo and signature
   t('passport-photo', 'Passport-size photo', 'photo', 'Camera', 'photo', { synonyms: ['photo', 'pp photo', 'tasveer'] }),
   t('stamp-photo', 'Stamp-size photo', 'photo', 'Image', 'photo', { synonyms: ['small photo'] }),
-  t('signature', 'Signature', 'photo', 'Signature', 'photo', { synonyms: ['sign', 'dastakhat', 'hastakshar'] }),
+  t('signature', 'Signature', 'photo', 'Signature', 'photo', { unique: true, versionLabels: ['On white paper', 'Scanned', 'Hindi'], synonyms: ['sign', 'dastakhat', 'hastakshar'] }),
 
   // ------------------------------------------------ Certificates
-  t('caste-certificate', 'Caste certificate', 'certificates', 'Stamp', 'a4', { number: { label: 'Certificate number' }, issueDate: true, synonyms: ['sc', 'st', 'obc', 'jati'] }),
+  t('caste-certificate', 'Caste certificate', 'certificates', 'Stamp', 'a4', { number: { label: 'Certificate number' }, issueDate: true, unique: true, versionLabels: ['Central format', 'State format', 'Attested copy'], synonyms: ['sc', 'st', 'obc', 'jati'] }),
   t('income-certificate', 'Income certificate', 'certificates', 'Stamp', 'a4', { number: { label: 'Certificate number' }, issueDate: true, expiry: VALID_TILL, synonyms: ['aay praman patra'] }),
   t('ews-certificate', 'EWS certificate', 'certificates', 'Stamp', 'a4', { number: { label: 'Certificate number' }, issueDate: true, expiry: VALID_TILL }),
-  t('domicile-certificate', 'Domicile certificate', 'certificates', 'Stamp', 'a4', { number: { label: 'Certificate number' }, issueDate: true, synonyms: ['niwas praman patra', 'residence certificate'] }),
-  t('disability-certificate', 'Disability certificate (UDID)', 'certificates', 'Stamp', 'card', { number: { label: 'UDID number' }, expiry: VALID_TILL }),
+  t('domicile-certificate', 'Domicile certificate', 'certificates', 'Stamp', 'a4', { number: { label: 'Certificate number' }, issueDate: true, unique: true, synonyms: ['niwas praman patra', 'residence certificate'] }),
+  t('disability-certificate', 'Disability certificate (UDID)', 'certificates', 'Stamp', 'card', { number: { label: 'UDID number' }, expiry: VALID_TILL, unique: true }),
   t('name-change-gazette', 'Name-change gazette', 'certificates', 'Newspaper', 'a4', { issueDate: true, synonyms: ['gazette'] }),
   t('marriage-certificate', 'Marriage certificate', 'certificates', 'Heart', 'a4', { number: { label: 'Registration number' }, issueDate: true, synonyms: ['shaadi', 'vivah'] }),
 
   // ------------------------------------------------ Education
-  t('class-10-marksheet', 'Class 10 marksheet', 'education', 'GraduationCap', 'a4', { number: { label: 'Roll number' }, synonyms: ['10th', 'matric', 'high school'] }),
-  t('class-10-certificate', 'Class 10 certificate', 'education', 'Award', 'a4', { number: { label: 'Roll number' }, synonyms: ['10th certificate'] }),
-  t('class-12-marksheet', 'Class 12 marksheet', 'education', 'GraduationCap', 'a4', { number: { label: 'Roll number' }, synonyms: ['12th', 'intermediate', 'senior secondary'] }),
-  t('class-12-certificate', 'Class 12 certificate', 'education', 'Award', 'a4', { number: { label: 'Roll number' }, synonyms: ['12th certificate'] }),
+  t('class-10-marksheet', 'Class 10 marksheet', 'education', 'GraduationCap', 'a4', { number: { label: 'Roll number' }, unique: true, versionLabels: ['DigiLocker copy', 'Attested copy'], synonyms: ['10th', 'matric', 'high school'] }),
+  t('class-10-certificate', 'Class 10 certificate', 'education', 'Award', 'a4', { number: { label: 'Roll number' }, unique: true, versionLabels: ['DigiLocker copy', 'Attested copy'], synonyms: ['10th certificate'] }),
+  t('class-12-marksheet', 'Class 12 marksheet', 'education', 'GraduationCap', 'a4', { number: { label: 'Roll number' }, unique: true, versionLabels: ['DigiLocker copy', 'Attested copy'], synonyms: ['12th', 'intermediate', 'senior secondary'] }),
+  t('class-12-certificate', 'Class 12 certificate', 'education', 'Award', 'a4', { number: { label: 'Roll number' }, unique: true, versionLabels: ['DigiLocker copy', 'Attested copy'], synonyms: ['12th certificate'] }),
   t('degree', 'Degree', 'education', 'Award', 'a4', { number: { label: 'Enrolment number' }, synonyms: ['graduation', 'convocation'] }),
   t('provisional-certificate', 'Provisional certificate', 'education', 'FileText', 'a4', { synonyms: ['provisional degree'] }),
   t('consolidated-marksheet', 'Consolidated marksheet', 'education', 'FileText', 'a4', {}),
@@ -136,7 +152,7 @@ export const TEMPLATES: readonly Template[] = [
   t('school-leaving', 'Transfer or school-leaving certificate', 'education', 'School', 'a4', { synonyms: ['tc', 'slc', 'leaving certificate'] }),
   t('character-certificate', 'Character certificate', 'education', 'FileCheck', 'a4', {}),
   t('entrance-scorecard', 'Entrance exam scorecard', 'education', 'Ticket', 'a4', { number: { label: 'Roll number' }, synonyms: ['jee', 'neet', 'cuet', 'admit card', 'result'] }),
-  t('apaar-id', 'APAAR / ABC ID', 'education', 'IdCard', 'card', { number: { label: 'APAAR ID' }, synonyms: ['abc id', 'one nation one student'] }),
+  t('apaar-id', 'APAAR / ABC ID', 'education', 'IdCard', 'card', { number: { label: 'APAAR ID' }, unique: true, synonyms: ['abc id', 'one nation one student'] }),
 
   // ------------------------------------------------ Work and income
   t('offer-letter', 'Offer letter', 'work', 'Mail', 'a4', {}),
@@ -145,8 +161,8 @@ export const TEMPLATES: readonly Template[] = [
   t('experience-letter', 'Experience letter', 'work', 'Mail', 'a4', {}),
   t('salary-slip', 'Salary slip', 'work', 'IndianRupee', 'a4', { synonyms: ['payslip', 'pay slip', 'tankhwah'] }),
   t('form-16', 'Form 16', 'work', 'FileText', 'a4', { synonyms: ['tds'] }),
-  t('pf-passbook', 'PF passbook', 'work', 'PiggyBank', 'a4', { nominee: true, number: { label: 'UAN' }, synonyms: ['epf', 'uan', 'provident fund'] }),
-  t('esic-card', 'ESIC card', 'work', 'IdCard', 'card', { number: { label: 'Insurance number' } }),
+  t('pf-passbook', 'PF passbook', 'work', 'PiggyBank', 'a4', { nominee: true, number: { label: 'UAN' }, unique: true, versionLabels: ['UAN card', 'Latest passbook'], synonyms: ['epf', 'uan', 'provident fund'] }),
+  t('esic-card', 'ESIC card', 'work', 'IdCard', 'card', { number: { label: 'Insurance number' }, unique: true }),
   t('ppo', 'Pension Payment Order (PPO)', 'work', 'Landmark', 'a4', { number: { label: 'PPO number' }, synonyms: ['pension', 'ppo'] }),
   t('professional-registration', 'Professional registration', 'work', 'Award', 'card', { number: { label: 'Registration number' }, expiry: VALID_TILL, synonyms: ['bar council', 'icai', 'medical council'] }),
 
@@ -154,8 +170,8 @@ export const TEMPLATES: readonly Template[] = [
   t('health-insurance-card', 'Health insurance card', 'health', 'ShieldCheck', 'card', {
     number: { label: 'Policy number' }, expiry: RENEWAL, synonyms: ['mediclaim', 'tpa card', 'cashless card', 'bima'],
   }),
-  t('abha', 'ABHA card', 'health', 'IdCard', 'card', { number: { label: 'ABHA number' }, synonyms: ['health id', 'ayushman bharat health account'] }),
-  t('ayushman-card', 'Ayushman Bharat card', 'health', 'IdCard', 'card', { number: { label: 'Card number' }, synonyms: ['pmjay', 'golden card'] }),
+  t('abha', 'ABHA card', 'health', 'IdCard', 'card', { number: { label: 'ABHA number' }, unique: true, synonyms: ['health id', 'ayushman bharat health account'] }),
+  t('ayushman-card', 'Ayushman Bharat card', 'health', 'IdCard', 'card', { number: { label: 'Card number' }, unique: true, synonyms: ['pmjay', 'golden card'] }),
   t('cghs-echs-card', 'CGHS or ECHS card', 'health', 'IdCard', 'card', { number: { label: 'Card number' }, expiry: VALID_TILL }),
   t('prescription', 'Prescription', 'health', 'Pill', 'a4', { issueDate: true, synonyms: ['parcha', 'dawai'] }),
   t('lab-report', 'Lab report', 'health', 'TestTube', 'a4', { issueDate: true, synonyms: ['blood test', 'report', 'jaanch'] }),
@@ -165,13 +181,14 @@ export const TEMPLATES: readonly Template[] = [
   t('pet-vaccination', 'Pet vaccination record', 'health', 'PawPrint', 'a4', { expiry: { label: 'Next dose due' }, synonyms: ['dog', 'cat', 'vet'] }),
 
   // ------------------------------------------------ Money
-  t('passbook', 'Passbook first page', 'money', 'BookOpen', 'a4', { number: { label: 'Account number' }, synonyms: ['bank passbook'] }),
-  t('cancelled-cheque', 'Cancelled cheque', 'money', 'Banknote', 'a4', { number: { label: 'Account number' }, synonyms: ['cheque'] }),
+  t('cancelled-cheque', 'Cancelled cheque', 'money', 'Banknote', 'a4', { number: { label: 'Account number' }, perAccount: true, short: 'cancelled cheque', synonyms: ['cheque', 'check', 'cancel cheque', 'chequebook'] }),
+  t('passbook', 'Passbook first page', 'money', 'BookOpen', 'a4', { number: { label: 'Account number' }, perAccount: true, short: 'passbook', synonyms: ['bank passbook', 'passbook'] }),
+  t('bank-statement', 'Bank statement', 'money', 'ReceiptText', 'a4', { number: { label: 'Account number' }, issueDate: true, perAccount: true, short: 'statement', synonyms: ['statement', 'account statement', 'bank statement'] }),
   t('fd-receipt', 'Fixed deposit receipt', 'money', 'PiggyBank', 'a4', { nominee: true, number: { label: 'FD number' }, expiry: { label: 'Matures on' }, synonyms: ['fd', 'fixed deposit'] }),
   t('ppf-passbook', 'PPF passbook', 'money', 'BookOpen', 'a4', { nominee: true, number: { label: 'PPF account number' }, expiry: { label: 'Matures on' } }),
   t('sukanya-passbook', 'Sukanya Samriddhi passbook', 'money', 'BookOpen', 'a4', { nominee: true, number: { label: 'Account number' }, synonyms: ['ssy'] }),
   t('post-office-passbook', 'Post-office passbook', 'money', 'BookOpen', 'a4', { nominee: true, number: { label: 'Account number' }, synonyms: ['dak ghar', 'kvp', 'nsc', 'rd'] }),
-  t('nps', 'NPS (PRAN card)', 'money', 'IdCard', 'card', { nominee: true, number: { label: 'PRAN' }, synonyms: ['pran', 'pension'] }),
+  t('nps', 'NPS (PRAN card)', 'money', 'IdCard', 'card', { nominee: true, number: { label: 'PRAN' }, unique: true, synonyms: ['pran', 'pension'] }),
   t('demat', 'Demat account statement', 'money', 'TrendingUp', 'a4', { nominee: true, number: { label: 'Demat ID' }, synonyms: ['shares', 'stocks', 'dp id'] }),
   t('mutual-fund', 'Mutual fund statement', 'money', 'ChartPie', 'a4', { nominee: true, number: { label: 'Folio number' }, synonyms: ['mf', 'sip', 'folio'] }),
   t('life-insurance', 'Life insurance policy', 'money', 'Umbrella', 'a4', { nominee: true, number: { label: 'Policy number' }, expiry: { label: 'Next premium due' }, synonyms: ['lic', 'term plan', 'jeevan bima', 'bima'] }),
@@ -203,15 +220,19 @@ export const TEMPLATES: readonly Template[] = [
   // ------------------------------------------------ Vehicles
   t('rc', 'Registration certificate (RC)', 'vehicles', 'Car', 'card', {
     sides: 2, number: { label: 'Registration number', kind: 'vehicle' }, expiry: { label: 'Registration valid till' },
+    perVehicle: true, unique: true, short: 'RC', versionLabels: ['Smart card', 'DigiLocker copy', 'Old RC'],
     synonyms: ['rc', 'gaadi ke kaagaz', 'registration'],
   }),
-  t('vehicle-insurance', 'Vehicle insurance', 'vehicles', 'ShieldCheck', 'a4', { number: { label: 'Policy number' }, expiry: RENEWAL, synonyms: ['gaadi bima', 'car insurance', 'bike insurance'] }),
-  t('puc', 'Pollution certificate (PUC)', 'vehicles', 'Gauge', 'a4', { number: { label: 'Certificate number' }, expiry: VALID_TILL, synonyms: ['puc', 'pollution'] }),
-  t('fastag', 'FASTag', 'vehicles', 'Ticket', 'card', { number: { label: 'FASTag ID' } }),
-  t('vehicle-invoice', 'Purchase invoice', 'vehicles', 'Receipt', 'a4', {}),
-  t('loan-noc', 'Loan NOC', 'vehicles', 'FileCheck', 'a4', { synonyms: ['noc', 'hypothecation'] }),
-  t('service-record', 'Service record', 'vehicles', 'Wrench', 'a4', { expiry: { label: 'Next service' } }),
-  t('challan', 'Challan', 'vehicles', 'ReceiptText', 'a4', { number: { label: 'Challan number' } }),
+  t('vehicle-insurance', 'Vehicle insurance', 'vehicles', 'ShieldCheck', 'a4', { number: { label: 'Policy number' }, expiry: RENEWAL, perVehicle: true, short: 'insurance', synonyms: ['gaadi bima', 'car insurance', 'bike insurance'] }),
+  t('puc', 'Pollution certificate (PUC)', 'vehicles', 'Gauge', 'a4', { number: { label: 'Certificate number' }, expiry: VALID_TILL, perVehicle: true, short: 'PUC', synonyms: ['puc', 'pollution'] }),
+  t('fastag', 'FASTag', 'vehicles', 'Ticket', 'card', { number: { label: 'FASTag ID' }, perVehicle: true, short: 'FASTag' }),
+  t('road-tax', 'Road tax receipt', 'vehicles', 'ReceiptText', 'a4', { number: { label: 'Receipt number' }, expiry: { label: 'Tax valid till' }, perVehicle: true, short: 'road tax', synonyms: ['road tax', 'motor vehicle tax'] }),
+  t('service-record', 'Service record', 'vehicles', 'Wrench', 'a4', { issueDate: true, expiry: { label: 'Next service' }, perVehicle: true, short: 'service', synonyms: ['servicing', 'service bill'] }),
+  t('vehicle-repair-bill', 'Repair or parts bill', 'vehicles', 'Receipt', 'a4', { issueDate: true, perVehicle: true, short: 'repair bill', synonyms: ['repair', 'mechanic', 'tyre', 'battery', 'parts'] }),
+  t('vehicle-invoice', 'Purchase invoice', 'vehicles', 'Receipt', 'a4', { perVehicle: true, short: 'purchase invoice', synonyms: ['invoice', 'showroom bill'] }),
+  t('vehicle-warranty', 'Warranty or extended warranty', 'vehicles', 'ShieldCheck', 'a4', { expiry: { label: 'Warranty ends' }, perVehicle: true, short: 'warranty', synonyms: ['warranty', 'extended warranty'] }),
+  t('loan-noc', 'Loan NOC', 'vehicles', 'FileCheck', 'a4', { perVehicle: true, short: 'loan NOC', synonyms: ['noc', 'hypothecation'] }),
+  t('challan', 'Challan', 'vehicles', 'ReceiptText', 'a4', { number: { label: 'Challan number' }, issueDate: true, perVehicle: true, short: 'challan' }),
 
   // ------------------------------------------------ Utilities
   t('electricity', 'Electricity bill', 'utilities', 'Zap', 'a4', { number: { label: 'Consumer / CA number' }, synonyms: ['bijli', 'light bill', 'ca number'] }),
@@ -316,3 +337,17 @@ export function templateForIdKind(kind: IdKind): Template {
   if (!found) throw new Error(`No template fills ${kind}`);
   return found;
 }
+
+/** What people usually keep a second copy as, for any paper without its own list. */
+export const COMMON_VERSION_LABELS = ['Self-attested copy', 'Colour scan', 'Old copy'];
+
+export function versionLabelsFor(template: Template): string[] {
+  return template.versionLabels ?? COMMON_VERSION_LABELS;
+}
+
+/** The papers a vehicle keeps, in the order its page shows them. */
+export const VEHICLE_TEMPLATES = TEMPLATES.filter((tpl) => tpl.perVehicle);
+/** The ones every vehicle needs: missing ones show as a gentle gap on its page. */
+export const VEHICLE_ESSENTIALS = ['rc', 'vehicle-insurance', 'puc'] as const;
+/** The papers a bank account keeps. */
+export const ACCOUNT_TEMPLATES = TEMPLATES.filter((tpl) => tpl.perAccount);

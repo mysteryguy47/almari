@@ -130,6 +130,79 @@ export async function buildPackPdf(input: PackPdfInput): Promise<Uint8Array> {
   return pdf.save();
 }
 
+/**
+ * One document as one PDF, to send in a single message: every page in order
+ * ('pages'), or a card's front and back together on one A4 page, the way a
+ * photocopy shop lays them out ('one-page').
+ */
+export async function buildDocumentPdf(input: { title: string; sources: PdfSource[]; layout: 'pages' | 'one-page' }): Promise<Uint8Array> {
+  const pdf = await PDFDocument.create();
+  pdf.setTitle(input.title);
+  pdf.setProducer('Almari');
+  const font = await pdf.embedFont(StandardFonts.Helvetica);
+  const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
+  const margin = 12 * MM;
+
+  if (input.layout === 'one-page') {
+    const images: PDFImage[] = [];
+    for (const source of input.sources) {
+      if (source.kind !== 'image') continue;
+      const img = await embedImage(pdf, source);
+      if (img) images.push(img);
+    }
+    if (images.length) {
+      const page = pdf.addPage([A4.width, A4.height]);
+      // Each side as large as two fit, one above the other.
+      const gap = 10 * MM;
+      const boxH = (A4.height - 2 * margin - gap * (images.length - 1)) / images.length;
+      const boxW = A4.width - 2 * margin;
+      const box = { width: Math.min(boxW, 170 * MM), height: Math.min(boxH, 110 * MM) };
+      const total = box.height * images.length + gap * (images.length - 1);
+      let top = (A4.height + total) / 2;
+      for (const img of images) {
+        const slot = { x: (A4.width - box.width) / 2, y: top - box.height, width: box.width, height: box.height };
+        page.drawImage(img, contain(img, slot));
+        top -= box.height + gap;
+      }
+    }
+    // Anything that is not a photo (a PDF page) follows on its own pages.
+    for (const source of input.sources) {
+      if (source.kind === 'pdf') await appendPdf(pdf, source.bytes, font, bold, input.title);
+    }
+    if (pdf.getPageCount() === 0) notePage(pdf, font, bold, input.title, 'Nothing here could go into a PDF. Share the files one by one.');
+    return pdf.save();
+  }
+
+  for (const source of input.sources) {
+    if (source.kind === 'pdf') {
+      await appendPdf(pdf, source.bytes, font, bold, input.title);
+      continue;
+    }
+    if (source.kind === 'missing') {
+      notePage(pdf, font, bold, input.title, source.reason);
+      continue;
+    }
+    const img = await embedImage(pdf, source);
+    if (!img) {
+      notePage(pdf, font, bold, input.title, 'This photo type cannot go into a PDF here. Share the photo separately.');
+      continue;
+    }
+    const page = pdf.addPage([A4.width, A4.height]);
+    page.drawImage(img, contain(img, { x: margin, y: margin, width: A4.width - 2 * margin, height: A4.height - 2 * margin }));
+  }
+  return pdf.save();
+}
+
+async function appendPdf(pdf: PDFDocument, bytes: Uint8Array, font: PDFFont, bold: PDFFont, title: string) {
+  try {
+    const other = await PDFDocument.load(bytes, { ignoreEncryption: false });
+    const pages = await pdf.copyPages(other, other.getPageIndices());
+    pages.forEach((p) => pdf.addPage(p));
+  } catch {
+    notePage(pdf, font, bold, title, 'This PDF is locked or damaged, so it could not be added. Share it separately.');
+  }
+}
+
 export interface SheetCard {
   title: string;
   front: PdfSource;

@@ -2,9 +2,10 @@
  * Bank and card helpers: network detection, masking, IFSC to bank name,
  * and the "share account details" text (which never includes secrets).
  */
+import { bankFromIfsc as bankByIfsc, POPULAR_BANKS } from './banks';
 import { getTemplate } from './templates';
 import { compactUpper, digitsOnly } from './validation';
-import type { BankAccount, BankAccountType, CardNetwork, CardType } from './types';
+import type { BankAccount, BankAccountType, CardItem, CardNetwork, CardType, Credential, SecretEntry } from './types';
 
 /** Best guess from the number's first digits; the person can always change it. */
 export function detectNetwork(number: string): CardNetwork {
@@ -58,27 +59,13 @@ export function listNumber(templateId: string, number: string | undefined): stri
   return getTemplate(templateId).profileId === 'aadhaar' ? maskAadhaar(number) : number;
 }
 
-/** Banks by the first four letters of the IFSC. Branch lookup needs the RBI list (server, MVP). */
-const IFSC_BANKS: Record<string, string> = {
-  SBIN: 'State Bank of India', HDFC: 'HDFC Bank', ICIC: 'ICICI Bank', UTIB: 'Axis Bank',
-  PUNB: 'Punjab National Bank', BARB: 'Bank of Baroda', CNRB: 'Canara Bank', UBIN: 'Union Bank of India',
-  KKBK: 'Kotak Mahindra Bank', IDIB: 'Indian Bank', BKID: 'Bank of India', IOBA: 'Indian Overseas Bank',
-  YESB: 'Yes Bank', INDB: 'IndusInd Bank', IDFB: 'IDFC FIRST Bank', MAHB: 'Bank of Maharashtra',
-  CBIN: 'Central Bank of India', UCBA: 'UCO Bank', PSIB: 'Punjab & Sind Bank', FDRL: 'Federal Bank',
-  KARB: 'Karnataka Bank', SIBL: 'South Indian Bank', RATN: 'RBL Bank', AUBL: 'AU Small Finance Bank',
-  IPOS: 'India Post Payments Bank', DBSS: 'DBS Bank India', HSBC: 'HSBC', SCBL: 'Standard Chartered',
-  JAKA: 'J&K Bank', TMBL: 'Tamilnad Mercantile Bank', CIUB: 'City Union Bank', KVBL: 'Karur Vysya Bank',
-  DLXB: 'Dhanlaxmi Bank', CSBK: 'CSB Bank', BDBL: 'Bandhan Bank', ESFB: 'Equitas Small Finance Bank',
-};
-
+/** The bank's full name from an IFSC ("SBIN0001234" → State Bank of India). */
 export function bankFromIfsc(ifsc: string | undefined): string | undefined {
-  if (!ifsc) return undefined;
-  const code = compactUpper(ifsc).slice(0, 4);
-  return IFSC_BANKS[code];
+  return bankByIfsc(ifsc)?.name;
 }
 
-/** Common Indian banks, for the bank picker. */
-export const COMMON_BANKS = Array.from(new Set(Object.values(IFSC_BANKS)));
+/** Common Indian banks, for the bank picker before anything is typed. */
+export const COMMON_BANKS = POPULAR_BANKS;
 
 /**
  * Clean text for "send me your account details". Name, account number, IFSC
@@ -110,4 +97,55 @@ export function ordinal(n: number): string {
   const s = ['th', 'st', 'nd', 'rd'];
   const v = n % 100;
   return n + (s[(v - 20) % 10] || s[v] || s[0]);
+}
+
+// ---------------------------------------------------------------- sharing a card
+
+export type CardShareField = 'name' | 'number' | 'expiry' | 'cvv';
+
+export const CARD_SHARE_LABELS: Record<CardShareField, string> = {
+  name: 'Name on card', number: 'Card number', expiry: 'Valid till', cvv: 'CVV',
+};
+
+/**
+ * The card's details as a message, the bank's name on top. Only the fields
+ * chosen; never the PIN. Sharing the CVV is the person's choice, made on the
+ * share sheet with a warning.
+ */
+export function shareCardText(card: CardItem, fields: CardShareField[], holderName?: string): string {
+  const lines = [card.bank + (card.nickname ? ` ${card.nickname}` : '')];
+  lines.push(`${CARD_TYPE_LABELS[card.type]}${card.network !== 'other' ? ` · ${NETWORK_LABELS[card.network]}` : ''}`);
+  const name = card.nameOnCard?.trim() || holderName?.trim();
+  if (fields.includes('name') && name) lines.push(`Name on card: ${name}`);
+  if (fields.includes('number')) lines.push(`Card number: ${groupCardNumber(card.number)}`);
+  if (fields.includes('expiry') && card.expiry) lines.push(`Valid till: ${card.expiry}`);
+  if (fields.includes('cvv') && card.cvv) lines.push(`CVV: ${card.cvv}`);
+  return lines.join('\n');
+}
+
+// ---------------------------------------------------------------- net banking and app logins
+
+/** Labels a bank login's passwords usually carry, offered as one-tap choices. */
+export const SECRET_LABELS = ['Login password', 'Profile password', 'Transaction password', 'MPIN', 'TPIN', 'Security answer'] as const;
+/** Kinds of bank login. */
+export const CREDENTIAL_LABELS = ['Net banking', 'Mobile app', 'Corporate login', 'Phone banking'] as const;
+
+/** A bank account's logins, reading accounts saved before there could be more than one. */
+export function bankCredentials(account: Pick<BankAccount, 'id' | 'credentials' | 'netbankingId' | 'netbankingPassword'>): Credential[] {
+  if (account.credentials?.length) return account.credentials;
+  if (!account.netbankingId && !account.netbankingPassword) return [];
+  const secrets: SecretEntry[] = account.netbankingPassword ? [{ id: `${account.id}-pw`, label: 'Login password', value: account.netbankingPassword }] : [];
+  return [{ id: `${account.id}-nb`, label: 'Net banking', username: account.netbankingId, secrets }];
+}
+
+/** Drops empty rows: a login with neither a user ID nor a password, a password with no value. */
+export function cleanCredentials(list: Credential[]): Credential[] {
+  return list
+    .map((c) => ({
+      ...c,
+      label: c.label.trim() || 'Login',
+      username: c.username?.trim() || undefined,
+      secrets: c.secrets.filter((x) => x.value).map((x) => ({ ...x, label: x.label.trim() || 'Password' })),
+    }))
+    .filter((c) => c.username || c.secrets.length);
 }

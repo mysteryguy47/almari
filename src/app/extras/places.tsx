@@ -6,6 +6,7 @@ import { Card, EmptyState, Row, Screen, Section } from '@/components/Layout';
 import { displayName, findMember, visibleTo } from '@/domain/access';
 import type { DocItem } from '@/domain/types';
 import { useCtx } from '@/store/hooks';
+import { mainFiles } from '@/domain/versions';
 
 /** Where is the original? Every paper by where it is kept. */
 export default function Places() {
@@ -37,7 +38,7 @@ export default function Places() {
                   key={d.id}
                   title={d.title}
                   subtitle={d.ownerId ? displayName(findMember(ctx.family, d.ownerId)) : 'Family'}
-                  left={<DocThumb templateId={d.templateId} file={d.files[0]} width={40} />}
+                  left={<DocThumb templateId={d.templateId} file={mainFiles(d)[0]} width={40} />}
                   divider={i > 0}
                   onPress={() => router.push(`/doc/${d.id}`)}
                 />

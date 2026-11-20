@@ -37,6 +37,8 @@ The backend is built: tables, access rules and server functions are in `supabase
 **A. Create the database.** Supabase → your project → **SQL Editor → New query**. Paste the whole migration file and press **Run**. You should see "Success. No rows returned". Run it once only; a second run stops at "already exists", which is harmless.
 (Command-line alternative: `npx supabase login`, `npx supabase link --project-ref <your-ref>`, `npx supabase db push`.)
 
+**A2. Later changes to the database.** Each later file in `supabase/migrations` is run the same way, once, in date order. `20261119120000_vehicles.sql` (19 Nov 2026) lets the server keep vehicles. It changes one rule and touches no data. Until it runs, the app keeps vehicles on the phone and syncs everything else; they go up by themselves once it has run.
+
 **B. Addresses.** **Authentication → URL Configuration**:
 - Site URL: `https://almari.blackmonkey.in`
 - Redirect URLs: add `https://almari.blackmonkey.in/**` (covers sign-in, email confirmation and password reset). Add `http://localhost:8081/**` only if you run the app on your Mac against this project.

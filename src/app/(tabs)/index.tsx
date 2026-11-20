@@ -19,6 +19,7 @@ import { attentionHref, stampFor } from '@/lib/attention';
 import { useCtx } from '@/store/hooks';
 import { useTheme } from '@/theme/ThemeProvider';
 import { radius, space, TAB_BAR_HEIGHT } from '@/theme/tokens';
+import { vehiclesOf } from '@/domain/vehicles';
 
 const LINES = [
   'Ghar ke saare kaagaz, ek jagah.',
@@ -192,7 +193,9 @@ export default function Home() {
               icon={c.icon}
               tint={c.tint}
               label={c.name}
-              badge={data.counts[c.id] ? `${data.counts[c.id]} saved` : 'Empty'}
+              badge={c.id === 'vehicles' && vehiclesOf(family).length
+                ? `${vehiclesOf(family).length} ${vehiclesOf(family).length === 1 ? 'vehicle' : 'vehicles'}`
+                : data.counts[c.id] ? `${data.counts[c.id]} saved` : 'Empty'}
               onPress={() => router.push(`/category/${c.id}`)}
             />
           ))}

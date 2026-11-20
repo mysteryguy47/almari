@@ -20,6 +20,7 @@ import { callNumber } from '@/lib/device';
 import { useCtx } from '@/store/hooks';
 import { useTheme } from '@/theme/ThemeProvider';
 import { space } from '@/theme/tokens';
+import { mainFiles } from '@/domain/versions';
 
 /** A person's page: numbers first (needed far more often than files), then papers, bank, emergency. */
 export default function Person() {
@@ -159,7 +160,7 @@ export default function Person() {
                   testID={`doc-${d.id}`}
                   title={d.title}
                   subtitle={d.expiryDate ? `${getTemplate(d.templateId).expiry?.label ?? 'Expires'} ${formatDate(d.expiryDate)}` : listNumber(d.templateId, d.number) ?? getTemplate(d.templateId).name}
-                  left={<DocThumb templateId={d.templateId} file={d.files[0]} width={44} />}
+                  left={<DocThumb templateId={d.templateId} file={mainFiles(d)[0]} width={44} />}
                   divider={i > 0}
                   right={d.onlyMe ? <Stamp text="Only me" /> : undefined}
                   onPress={() => router.push(`/doc/${d.id}`)}

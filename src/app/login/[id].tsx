@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Stamp } from '@/components/Bits';
 import { Button } from '@/components/Button';
+import { SecretsEditor } from '@/components/Credentials';
 import { Segmented, TextField } from '@/components/Fields';
 import { DeleteItem, NotFound, OnlyMeToggle, OwnerPicker, ownerName } from '@/components/ItemBits';
 import { Card, Screen } from '@/components/Layout';
@@ -11,7 +12,7 @@ import { countFilled, More } from '@/components/More';
 import { ValueRow } from '@/components/Secret';
 import { T } from '@/components/Text';
 import { canSee } from '@/domain/access';
-import type { LoginItem } from '@/domain/types';
+import type { LoginItem, SecretEntry } from '@/domain/types';
 import { checkRequiredText } from '@/domain/validation';
 import { shareText } from '@/lib/device';
 import { ensureReauth } from '@/lib/reauth';
@@ -27,6 +28,9 @@ function generatePassword(): string {
   return `${pick()}-${pick()}-${pick()}-${10 + Math.floor(Math.random() * 90)}`;
 }
 
+/** Second passwords sites often have. */
+const EXTRA_LABELS = ['Transaction password', 'Profile password', 'PIN', 'Security answer'] as const;
+
 export default function Login() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const ctx = useCtx();
@@ -37,6 +41,7 @@ export default function Login() {
   const [title, setTitle] = useState(existing?.title ?? '');
   const [username, setUsername] = useState(existing?.username ?? '');
   const [password, setPassword] = useState(existing?.password ?? '');
+  const [extraSecrets, setExtraSecrets] = useState<SecretEntry[]>(existing?.extraSecrets ?? []);
   const [website, setWebsite] = useState(existing?.website ?? '');
   const [notes, setNotes] = useState(existing?.notes ?? '');
   const [ownerId, setOwnerId] = useState<string | undefined>(existing ? existing.ownerId : ctx?.viewerId);
@@ -65,6 +70,7 @@ export default function Login() {
         <Card>
           <ValueRow label={existing.kind === 'wifi' ? 'Network name' : 'Username'} value={existing.username} />
           <ValueRow label="Password" value={existing.password} secret testID="login-password" />
+          {(existing.extraSecrets ?? []).map((x) => <ValueRow key={x.id} label={x.label} value={x.value} secret testID={`login-extra-${x.id}`} />)}
           <ValueRow label="Website or app" value={existing.website} />
           {existing.notes ? <View style={styles.notes}><T variant="label" color="ink2">Notes</T><T variant="body">{existing.notes}</T></View> : null}
         </Card>
@@ -85,6 +91,10 @@ export default function Login() {
     if (titleCheck.level === 'error') return;
     const saved = saveLogin({
       id: existing?.id, kind, title: title.trim(), username: username.trim() || undefined, password: password || undefined,
+      extraSecrets: (() => {
+        const kept = extraSecrets.filter((x) => x.value).map((x) => ({ ...x, label: x.label.trim() || 'Password' }));
+        return kind === 'login' && kept.length ? kept : undefined;
+      })(),
       website: website.trim() || undefined, notes: notes.trim() || undefined, ownerId, onlyMe: ownerId === viewerId ? onlyMe : false,
     });
     toast('Saved in the locker', { tone: 'success' });
@@ -106,6 +116,9 @@ export default function Login() {
         testID="login-password-input"
         right={<Pressable onPress={() => setPassword(generatePassword())} accessibilityRole="button" accessibilityLabel="Suggest a password" hitSlop={8}><T variant="smallStrong" color="accent">Suggest</T></Pressable>}
       />
+      {kind === 'login' ? (
+        <SecretsEditor secrets={extraSecrets} onChange={setExtraSecrets} presets={EXTRA_LABELS} testID="login-extra" />
+      ) : null}
       <OwnerPicker family={family} value={ownerId} onChange={setOwnerId} allowFamily title="Who uses it?" />
       <OnlyMeToggle visible={ownerId === viewerId} value={onlyMe} onChange={setOnlyMe} />
       <More

@@ -63,6 +63,22 @@ npx expo export -p web   # production web build in dist/ (installable, works off
 | Life-stage nudges | Home → Coming up, and Reminders | Aadhaar biometric updates at 5 and 15, voter ID and own login at 18, senior-citizen benefits at 60, the pensioner's life certificate in November. One tap makes a task. |
 | Money map | Home → Handy → Money map | Every account, deposit and policy in one list, with the nominee where one is noted and a flag where none is. |
 
+## November 2026: one paper, many copies
+
+| Feature | Where | How it works |
+| --- | --- | --- |
+| One paper per person, with versions | Any Aadhaar, PAN, licence, passport, marksheet, RC… | Adding a second Aadhaar for the same person adds a version to the first instead (Masked, e-Aadhaar PDF, PVC card, self-attested copy). Each version has its own pages, a name, and can be renamed or removed. Papers saved twice before this rule show "Saved 2 times" with a one-tap merge. |
+| Share the whole paper | A paper with several pages → Share | All pages as one PDF, or a card's front and back on one A4 page like a photocopy, or one page. |
+| Crop | Any photo, when adding it or under Crop or resize | Free, square, portrait, landscape or ID-card shape; drag the corners or the frame; turn the photo. A photo from the camera opens in the crop tool straight away. |
+| Vehicles | Home → Vehicles | Each car, scooter or tractor has its own page: number plate, RC, insurance, PUC, service records and bills, with the paper that needs doing first. An RC already saved with the same plate files itself. |
+| Banks | Bank account and card forms | About 120 Indian banks suggested from two letters, including old names of merged banks ("Vijaya" finds Bank of Baroda) and each state's gramin bank. Each bank has a mark in its own colour, also on the card itself. |
+| Several logins per account | Bank account → More → Net banking and app logins | One user ID with a login, profile and transaction password, and another login (the bank's app with its MPIN). Website logins can keep a second password too. |
+| Cheque and passbook | Bank account → Cheque, passbook and statements | Filed under the account, with its number and the bank in the title. |
+| Share card details | A card → Share card details | Bank on top, then the name, number, expiry and, if chosen, the CVV. Never the PIN. Asks for the fingerprint or PIN first. |
+| Names filled in | New account or card | The account holder and the name on the card follow the person picked, until typed over. |
+
+Marks are Almari's own drawings (a short name on a colour), not logos: bank logos are trademarks, and the Aadhaar logo and the national emblem may not be used by apps outside the government.
+
 ## What works, and what is still to come
 
 | Works (web and Android) | Still to come |

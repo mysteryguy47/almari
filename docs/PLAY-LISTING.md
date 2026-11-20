@@ -22,7 +22,7 @@ If you would rather lead with what people search for in India, this one is 72:
 Aadhaar, PAN, passwords and bank details for the whole family, encrypted.
 ```
 
-## Full description (2,720 of 4,000)
+## Full description (3,218 of 4,000)
 
 ```text
 Ghar ke saare kaagaz, ek jagah.
@@ -46,6 +46,13 @@ Made for the whole family
 • Add children, grandparents and pets as profiles, no email needed.
 • A family to-do list: give a task to Papa, and his phone reminds him the evening before.
 • A readiness check shows which essentials are saved and which are missing.
+
+One paper, every copy
+• One Aadhaar per person, with every copy kept with it: the masked copy, PVC card, e-Aadhaar PDF and a self-attested photocopy.
+• Share every page as one PDF, or front and back on one page like a photocopy.
+• Crop photos free, square, portrait, landscape or to ID-card shape.
+• Each vehicle with its own RC, insurance, PUC, service records and bills.
+• Bank names suggested as you type. Net banking with every password it has: login, profile, transaction and the app's MPIN.
 
 Never miss a renewal
 • A reminder on your phone before a passport, licence, insurance policy, PUC or warranty runs out, and before a card bill is due.
@@ -72,7 +79,7 @@ Almari is not affiliated with the Government of India, UIDAI or any bank. Copies
 Privacy policy: https://almari.blackmonkey.in/privacy
 ```
 
-Everything above is true of the Android app today. Reminders are scheduled on the phone, so they work without internet; Android may deliver them a little after the hour. Reading from a photo uses Google ML Kit inside the app: the photo stays on the phone, and ML Kit's diagnostics are declared in the data safety form (see ANDROID.md).
+Everything above is true of the Android app from version code 5 (19 Nov 2026: versions, crop, vehicles, bank suggestions, several passwords per account). With version code 4, leave out the "One paper, every copy" block. Reminders are scheduled on the phone, so they work without internet; Android may deliver them a little after the hour. Reading from a photo uses Google ML Kit inside the app: the photo stays on the phone, and ML Kit's diagnostics are declared in the data safety form (see ANDROID.md).
 
 ## App details
 

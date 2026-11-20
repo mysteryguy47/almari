@@ -3,22 +3,28 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { BankCard } from '@/components/BankCard';
+import { BankField } from '@/components/BankField';
 import { Stamp } from '@/components/Bits';
 import { Button } from '@/components/Button';
 import { ChipChoice, Segmented, TextField, ToggleRow } from '@/components/Fields';
 import { DeleteItem, NotFound, OnlyMeToggle, OwnerPicker, ownerName } from '@/components/ItemBits';
-import { ChipScroller } from '@/components/ChipScroller';
 import { countFilled, More, MoreGroup } from '@/components/More';
 import { Card, Screen } from '@/components/Layout';
 import { ValueRow } from '@/components/Secret';
+import { Sheet } from '@/components/Sheet';
 import { T } from '@/components/Text';
-import { canSee, visibleTo } from '@/domain/access';
+import { canSee, findMember, visibleTo } from '@/domain/access';
 import { daysUntil, formatDate, relativeDays } from '@/domain/dates';
-import { CARD_TYPE_LABELS, COMMON_BANKS, detectNetwork, formatRupees, groupCardNumber, maskTail, NETWORK_LABELS, ordinal } from '@/domain/money';
+import {
+  CARD_SHARE_LABELS, CARD_TYPE_LABELS, detectNetwork, formatRupees, groupCardNumber, maskTail, NETWORK_LABELS, ordinal, shareCardText,
+  type CardShareField,
+} from '@/domain/money';
 import { nextMonthlyDate } from '@/domain/reminders';
 import type { CardNetwork, CardType } from '@/domain/types';
 import { checkCardExpiry, checkCardNumber, checkDayOfMonth, checkRequiredText, digitsOnly } from '@/domain/validation';
+import { shareText } from '@/lib/device';
 import { CARD_TYPES } from '@/lib/options';
+import { ensureReauth } from '@/lib/reauth';
 import { useApp } from '@/store/app-store';
 import { useCtx } from '@/store/hooks';
 import { toast } from '@/store/ui-store';
@@ -39,6 +45,10 @@ export default function CardScreen() {
   const [bank, setBank] = useState(c?.bank ?? '');
   const [nickname, setNickname] = useState(c?.nickname ?? '');
   const [nameOnCard, setNameOnCard] = useState(c?.nameOnCard ?? '');
+  // A new card's name follows whoever it is for, in capitals as cards print it, until typed over.
+  const [nameEdited, setNameEdited] = useState(!!c);
+  const [sharing, setSharing] = useState(false);
+  const [shareFields, setShareFields] = useState<CardShareField[]>(['name', 'number', 'expiry']);
   const [number, setNumber] = useState(c ? groupCardNumber(c.number) : '');
   const [network, setNetwork] = useState<CardNetwork>(c?.network ?? 'other');
   const [networkTouched, setNetworkTouched] = useState(!!c);
@@ -50,7 +60,7 @@ export default function CardScreen() {
   const [showSecrets, setShowSecrets] = useState(!!(c?.cvv || c?.pin));
   const [cvv, setCvv] = useState(c?.cvv ?? '');
   const [pin, setPin] = useState(c?.pin ?? '');
-  const [moreOpen, setMoreOpen] = useState(!!c && countFilled(c.nickname, c.nameOnCard, c.creditLimit, c.statementDay, c.dueDay, c.linkedAccountId) > 0);
+  const [moreOpen, setMoreOpen] = useState(!!c && countFilled(c.nickname, c.creditLimit, c.statementDay, c.dueDay, c.linkedAccountId) > 0);
   const [onlyMe, setOnlyMe] = useState(c?.onlyMe ?? false);
   const [tried, setTried] = useState(false);
 
@@ -63,6 +73,17 @@ export default function CardScreen() {
     const due = c.type === 'credit' && c.dueDay ? nextMonthlyDate(c.dueDay) : undefined;
     const dueIn = due ? daysUntil(due) : null;
     const isOwner = c.ownerId === viewerId;
+    const holderName = findMember(family, c.ownerId)?.fullName;
+    const available = (Object.keys(CARD_SHARE_LABELS) as CardShareField[]).filter((f) =>
+      f === 'number' ? true : f === 'expiry' ? !!c.expiry : f === 'cvv' ? !!c.cvv : !!(c.nameOnCard || holderName));
+    const chosen = shareFields.filter((f) => available.includes(f));
+    const share = async () => {
+      if (!chosen.length) return;
+      if (!(await ensureReauth('Share card details'))) return;
+      setSharing(false);
+      const result = await shareText(shareCardText(c, chosen, holderName), `${c.bank} card`);
+      toast(result === 'copied' ? 'Card details copied. Paste them only where you mean to.' : 'Card details shared. Never share the PIN or an OTP.', { tone: 'success' });
+    };
     return (
       <Screen
         title={`${c.bank}${c.nickname ? ` ${c.nickname}` : ''}`}
@@ -73,6 +94,9 @@ export default function CardScreen() {
         <BankCard card={c} accountLabel={account ? `${account.bank} ${maskTail(account.accountNumber)}` : undefined} testID="bank-card" />
         <T variant="small" color="ink3" align="center" style={styles.hint}>Tap the card to flip it</T>
         {c.onlyMe ? <View style={styles.stamp}><Stamp text="Only me" /></View> : null}
+        <View style={styles.block}>
+          <Button label="Share card details" icon="Send" onPress={() => setSharing(true)} testID="share-card" />
+        </View>
         {due ? (
           <Card style={styles.block}>
             <T variant="label" color="ink2">Next bill</T>
@@ -97,11 +121,34 @@ export default function CardScreen() {
           <ValueRow label="PIN" value={c.pin} secret guard={GUARD} />
         </Card>
         <DeleteItem collection="cards" id={c.id} title={`${c.bank} card`} />
+
+        <Sheet visible={sharing} onClose={() => setSharing(false)} title="Share card details" subtitle="The bank’s name goes on top. Pick what to send." testID="share-card-sheet">
+          <Card padded={false} style={styles.shareCard}>
+            {available.map((f, i) => (
+              <View key={f} style={[styles.shareRow, i > 0 ? styles.shareDivider : null]}>
+                <ToggleRow
+                  title={CARD_SHARE_LABELS[f]}
+                  subtitle={f === 'number' ? maskTail(c.number) : f === 'expiry' ? c.expiry : f === 'cvv' ? 'Anyone with the number and CVV can spend online' : (c.nameOnCard || holderName)}
+                  value={chosen.includes(f)}
+                  onValueChange={(on) => setShareFields((list) => (on ? [...list.filter((x) => x !== f), f] : list.filter((x) => x !== f)))}
+                  testID={`share-${f}`}
+                />
+              </View>
+            ))}
+          </Card>
+          {chosen.includes('cvv') ? (
+            <T variant="small" color="sindoor" style={styles.shareWarn}>Send the CVV only to family you trust, and never to someone who called you. The PIN is never shared.</T>
+          ) : (
+            <T variant="small" color="ink2" style={styles.shareWarn}>The PIN is never shared. Asks for your fingerprint or PIN first.</T>
+          )}
+          <Button label={chosen.length ? 'Share' : 'Pick something to share'} icon="Share2" onPress={share} disabled={!chosen.length} testID="share-card-go" />
+        </Sheet>
       </Screen>
     );
   }
 
   const ownerAccounts = visibleTo(family, viewerId, family.bankAccounts).filter((a) => a.ownerId === ownerId);
+  const shownName = nameEdited ? nameOnCard : (findMember(family, ownerId)?.fullName ?? '').toUpperCase();
   const checks = {
     bank: checkRequiredText(bank, 'Bank', 60),
     number: checkCardNumber(number),
@@ -126,7 +173,7 @@ export default function CardScreen() {
       return;
     }
     const saved = saveCard({
-      id: c?.id, type, ownerId, bank: bank.trim(), nickname: nickname.trim() || undefined, nameOnCard: nameOnCard.trim() || undefined,
+      id: c?.id, type, ownerId, bank: bank.trim(), nickname: nickname.trim() || undefined, nameOnCard: shownName.trim() || undefined,
       number: digitsOnly(number), network, expiry: expiry || undefined,
       linkedAccountId: type === 'debit' ? linkedAccountId : undefined,
       creditLimit: creditLimit ? Number(digitsOnly(creditLimit)) : undefined,
@@ -147,21 +194,32 @@ export default function CardScreen() {
         {type === 'credit' ? 'A credit card needs no bank account here. Add as many as you have, even several from one bank.' : 'A debit card can point to one of the owner’s accounts.'}
       </T>
       <OwnerPicker family={family} value={ownerId} onChange={setOwnerId} />
-      <TextField label="Bank or issuer" value={bank} onChangeText={setBank} required check={checks.bank} showCheck={tried} testID="card-bank" />
-      {!bank ? <ChipScroller options={COMMON_BANKS.slice(0, 10)} onPick={setBank} testID="bank-suggestions" /> : null}
+      <BankField label="Bank or issuer" value={bank} onChange={setBank} check={checks.bank} showCheck={tried} issuers testID="card-bank" />
       <TextField label="Card number" value={number} onChangeText={onNumber} keyboardType="number-pad" required check={checks.number} showCheck={tried || digitsOnly(number).length >= 12} helper={network !== 'other' ? NETWORK_LABELS[network] : undefined} testID="card-number-input" />
-      <TextField label="Valid till (MM/YY)" value={expiry} onChangeText={onExpiry} keyboardType="number-pad" check={checks.expiry} testID="card-expiry" />
+      <View style={styles.row}>
+        <View style={styles.flex}><TextField label="Valid till (MM/YY)" value={expiry} onChangeText={onExpiry} keyboardType="number-pad" check={checks.expiry} testID="card-expiry" /></View>
+      </View>
+      <TextField
+        label="Name on card"
+        value={shownName}
+        onChangeText={(v) => {
+          setNameEdited(true);
+          setNameOnCard(v);
+        }}
+        autoCapitalize="characters"
+        helper={!nameEdited ? 'From the profile. Cards often shorten it: RAJESH K SHARMA.' : undefined}
+        testID="card-name"
+      />
       <OnlyMeToggle visible={ownerId === viewerId} value={onlyMe} onChange={setOnlyMe} />
       <More
-        summary={type === 'credit' ? 'Card name, name on card, network, bill dates and limit, CVV and PIN' : type === 'debit' ? 'Card name, name on card, network, linked account, CVV and PIN' : 'Card name, name on card, network, CVV and PIN'}
-        filled={countFilled(nickname, nameOnCard, type === 'credit' ? creditLimit : '', type === 'credit' ? statementDay : '', type === 'credit' ? dueDay : '', type === 'debit' ? linkedAccountId : '', showSecrets ? cvv || pin : '')}
+        summary={type === 'credit' ? 'Card name, network, bill dates and limit, CVV and PIN' : type === 'debit' ? 'Card name, network, linked account, CVV and PIN' : 'Card name, network, CVV and PIN'}
+        filled={countFilled(nickname, type === 'credit' ? creditLimit : '', type === 'credit' ? statementDay : '', type === 'credit' ? dueDay : '', type === 'debit' ? linkedAccountId : '', showSecrets ? cvv || pin : '')}
         open={moreOpen || (tried && [checks.statement, checks.due].some((x) => x.level === 'error'))}
         onToggle={setMoreOpen}
         testID="card-more"
       >
         <MoreGroup title="On the card">
           <TextField label="Card name (optional)" value={nickname} onChangeText={setNickname} placeholder="Shopping card, Travel card" testID="card-nickname" />
-          <TextField label="Name on card" value={nameOnCard} onChangeText={setNameOnCard} autoCapitalize="characters" />
           <T variant="smallStrong" color="ink2">Network</T>
           <View style={styles.networks}>
             <ChipChoice options={NETWORKS} value={network} onChange={(n) => { setNetwork(n); setNetworkTouched(true); }} />
@@ -207,4 +265,8 @@ const styles = StyleSheet.create({
   block: { marginBottom: space.lg, gap: space.sm },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm, marginTop: -space.sm, marginBottom: space.lg },
   networks: { marginBottom: space.lg },
+  shareCard: { marginBottom: space.md },
+  shareRow: { paddingHorizontal: space.lg, paddingVertical: space.xs },
+  shareDivider: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: 'rgba(128,128,128,0.25)' },
+  shareWarn: { marginBottom: space.lg },
 });

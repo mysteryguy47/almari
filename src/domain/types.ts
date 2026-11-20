@@ -109,7 +109,24 @@ export interface FileRef {
   key?: string;
   /** The family whose folder holds it on the server. */
   familyId?: ID;
+  /** Which version of the document this page belongs to (see DocVersion). Absent: the first version. */
+  versionId?: ID;
 }
+
+/**
+ * Another copy of the same paper, kept on the same document: a masked
+ * Aadhaar, the PVC card, the e-Aadhaar PDF, a self-attested photocopy.
+ * Its pages are the document's files carrying this version's id. The
+ * first version (files without a version id) has the id MAIN_VERSION.
+ */
+export interface DocVersion {
+  id: ID;
+  label: string;
+  addedAt: number;
+  addedBy: ID;
+}
+
+export const MAIN_VERSION = 'main';
 
 export interface DocItem extends Ownable {
   templateId: string;
@@ -126,12 +143,39 @@ export interface DocItem extends Ownable {
   files: FileRef[];
   /** Members who muted reminders for this document. */
   mutedBy: ID[];
+  /** Every version, in order, when there is more than one (or the first was renamed). */
+  versions?: DocVersion[];
+  /** The family vehicle this paper belongs to (RC, insurance, service record). */
+  vehicleId?: ID;
+  /** The bank account this paper belongs to (cancelled cheque, passbook, statement). */
+  accountId?: ID;
+}
+
+/** One labelled password: "Login password", "Profile password", "MPIN". */
+export interface SecretEntry {
+  id: ID;
+  label: string;
+  value: string;
+}
+
+/**
+ * A username with one or more passwords. Banks give several: SBI net banking
+ * has one user ID with a login, a profile and a transaction password.
+ */
+export interface Credential {
+  id: ID;
+  /** "Net banking", "Mobile app (YONO)". */
+  label: string;
+  username?: string;
+  secrets: SecretEntry[];
 }
 
 export interface LoginItem extends Ownable {
   title: string;
   username?: string;
   password?: string;
+  /** More passwords for the same login: a transaction PIN, a profile password. */
+  extraSecrets?: SecretEntry[];
   website?: string;
   notes?: string;
   kind: 'login' | 'wifi';
@@ -147,6 +191,9 @@ export interface BankAccount extends Ownable {
   ifsc?: string;
   branch?: string;
   customerId?: string;
+  /** Net banking, the bank's app, a corporate login: each with its own user ID and passwords. */
+  credentials?: Credential[];
+  /** Before credentials (Nov 2026): one net-banking ID and password. Read through bankCredentials(). */
   netbankingId?: string;
   netbankingPassword?: string;
   registeredMobile?: string;
@@ -177,6 +224,20 @@ export interface CardItem extends Ownable {
   statementDay?: number;
   dueDay?: number;
   mutedBy: ID[];
+}
+
+export type VehicleKind = 'car' | 'bike' | 'scooter' | 'tractor' | 'commercial' | 'other';
+
+/** A family vehicle: its RC, insurance, PUC, bills and service records sit under it. Common to the family. */
+export interface Vehicle extends Ownable {
+  /** "Swift Dzire", "Activa". */
+  name: string;
+  kind: VehicleKind;
+  /** The number plate, without spaces: "DL3CAB1234". */
+  number?: string;
+  /** The member the RC is in the name of (shown only; it does not limit who sees it). */
+  registeredTo?: ID;
+  notes?: string;
 }
 
 export interface SecureNote extends Ownable {
@@ -262,6 +323,8 @@ export interface Family {
   bankAccounts: BankAccount[];
   cards: CardItem[];
   notes: SecureNote[];
+  /** Absent in families saved before vehicles existed (Nov 2026). */
+  vehicles?: Vehicle[];
   tasks: Task[];
   contacts: Contact[];
   activity: ActivityEntry[];

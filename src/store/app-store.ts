@@ -18,9 +18,12 @@ import { afterWrongPin, attemptsLeft, canApproveRemoval, checkRemoval, MAX_MEMBE
 import { buildSampleFamily, SAMPLE_FAMILY_ID, SAMPLE_VIEWER_ID } from '@/domain/sample';
 import { getTemplate } from '@/domain/templates';
 import type {
-  ActivityKind, BankAccount, CardItem, Contact, DocItem, Family, ID, IdKind, LoginItem, Member,
-  PersonalSharing, ReminderPrefs, SecureNote, Task, ThemePref,
+  ActivityKind, BankAccount, CardItem, Contact, DocItem, Family, FileRef, ID, IdKind, LoginItem, Member,
+  PersonalSharing, ReminderPrefs, SecureNote, Task, ThemePref, Vehicle,
 } from '@/domain/types';
+import { MAIN_VERSION } from '@/domain/types';
+import { docVersions, freshLabel, versionFiles } from '@/domain/versions';
+import { normalisePlate } from '@/domain/vehicles';
 import { normaliseEmail } from '@/domain/validation';
 import type { CloudState } from '@/sync/types';
 
@@ -70,13 +73,14 @@ const fail = (error: string): Result<never> => ({ ok: false, error });
 
 export type PinResult = { status: 'ok' } | { status: 'wrong'; attemptsLeft: number } | { status: 'locked-out' };
 
-export type Collection = 'documents' | 'logins' | 'bankAccounts' | 'cards' | 'notes';
+export type Collection = 'documents' | 'logins' | 'bankAccounts' | 'cards' | 'notes' | 'vehicles';
 
 export type DocInput = Omit<DocItem, 'id' | 'createdAt' | 'updatedAt' | 'createdBy' | 'mutedBy'> & { id?: ID };
 export type LoginInput = Omit<LoginItem, 'id' | 'createdAt' | 'updatedAt' | 'createdBy'> & { id?: ID };
 export type BankInput = Omit<BankAccount, 'id' | 'createdAt' | 'updatedAt' | 'createdBy'> & { id?: ID };
 export type CardInput = Omit<CardItem, 'id' | 'createdAt' | 'updatedAt' | 'createdBy' | 'mutedBy'> & { id?: ID };
 export type NoteInput = Omit<SecureNote, 'id' | 'createdAt' | 'updatedAt' | 'createdBy'> & { id?: ID };
+export type VehicleInput = Omit<Vehicle, 'id' | 'createdAt' | 'updatedAt' | 'createdBy' | 'onlyMe' | 'ownerId'> & { id?: ID };
 export type TaskInput = Omit<Task, 'id' | 'createdAt' | 'createdBy' | 'done'> & { id?: ID };
 export type ContactInput = Omit<Contact, 'id' | 'createdAt' | 'createdBy'> & { id?: ID };
 export type MemberInput = Omit<Member, 'id' | 'createdAt' | 'status' | 'addedBy'> & { id?: ID };
@@ -121,6 +125,18 @@ export interface AppState extends PersistedState {
   saveBankAccount(input: BankInput): ID;
   saveCard(input: CardInput): ID;
   saveNote(input: NoteInput): ID;
+  saveVehicle(input: VehicleInput): ID;
+  /** Files vehicle papers under a vehicle (papers saved before vehicles existed). */
+  fileUnderVehicle(docIds: ID[], vehicleId: ID): void;
+  /** Another version of a document (masked, PVC card, attested copy): its pages, under a label. Returns the version id. */
+  addDocVersion(docId: ID, label: string, files: FileRef[]): ID | undefined;
+  /** More pages for a version already there (the masked back after the masked front). */
+  addVersionPages(docId: ID, versionId: ID, files: FileRef[]): void;
+  renameDocVersion(docId: ID, versionId: ID, label: string): void;
+  /** Removes one version and its pages. Removing the first promotes the next one. */
+  removeDocVersion(docId: ID, versionId: ID): void;
+  /** Folds duplicates of a one-per-person paper into `keepId`, each as a version. */
+  mergeDocuments(keepId: ID, otherIds: ID[]): void;
   deleteItem(collection: Collection, id: ID): void;
   restoreItem(collection: Collection, id: ID): void;
   purgeDeleted(now?: number): void;
@@ -177,14 +193,15 @@ function log(family: Family, by: ID, kind: ActivityKind, text: string) {
 }
 
 function collectionLabel(collection: Collection): string {
-  return { documents: 'document', logins: 'login', bankAccounts: 'bank account', cards: 'card', notes: 'note' }[collection];
+  return { documents: 'document', logins: 'login', bankAccounts: 'bank account', cards: 'card', notes: 'note', vehicles: 'vehicle' }[collection];
 }
 
 function itemTitle(family: Family, collection: Collection, id: ID): string {
-  const item = (family[collection] as { id: ID; title?: string; bank?: string; nickname?: string }[]).find((i) => i.id === id);
+  const item = ((family[collection] ?? []) as { id: ID; title?: string; bank?: string; nickname?: string; name?: string }[]).find((i) => i.id === id);
   if (!item) return collectionLabel(collection);
   if (collection === 'bankAccounts') return `${item.bank} account`;
   if (collection === 'cards') return `${item.bank} ${item.nickname ?? 'card'}`;
+  if (collection === 'vehicles') return item.name ?? 'a vehicle';
   return item.title ?? collectionLabel(collection);
 }
 
@@ -282,7 +299,7 @@ export const useApp = create<AppState>()(
             s.families[familyId] = {
               id: familyId, name: name.trim(), createdAt: now, createdBy: memberId, personalSharing: 'family', storage: 'local', localViewerId: memberId,
               members: [{ id: memberId, kind: 'account', fullName: you.fullName.trim(), dob: you.dob, gender: you.gender, phone: you.phone, ids: {}, status: 'active', addedBy: memberId, createdAt: now }],
-              documents: [], logins: [], bankAccounts: [], cards: [], notes: [], tasks: [], contacts: [],
+              documents: [], logins: [], bankAccounts: [], cards: [], notes: [], vehicles: [], tasks: [], contacts: [],
               activity: [{ id: newId(), at: now, by: memberId, kind: 'member', text: `started ${name.trim()}` }],
               reminderPrefs: {}, removalRequests: [], dismissedNudges: [],
             };
@@ -538,9 +555,148 @@ export const useApp = create<AppState>()(
           return id;
         },
 
+        saveVehicle(input) {
+          let id = input.id ?? '';
+          onFamily((family, viewer) => {
+            family.vehicles ??= [];
+            // A vehicle belongs to the whole family: never Only me, never one member's.
+            const r = upsert(family.vehicles, { ...input, onlyMe: false, ownerId: undefined }, viewer);
+            id = r.id;
+            // An RC already saved with this number plate belongs to it.
+            const plate = input.number ? normalisePlate(input.number) : '';
+            if (plate.length >= 6) {
+              for (const d of family.documents) {
+                if (!d.deletedAt && !d.vehicleId && getTemplate(d.templateId).perVehicle && d.number && normalisePlate(d.number) === plate) {
+                  d.vehicleId = r.id;
+                  d.updatedAt = Date.now();
+                }
+              }
+            }
+            log(family, viewer, r.created ? 'added' : 'changed', `${r.created ? 'added the vehicle' : 'updated the vehicle'} ${input.name}`);
+          });
+          return id;
+        },
+
+        fileUnderVehicle(docIds, vehicleId) {
+          onFamily((family, viewer) => {
+            const vehicle = family.vehicles?.find((v) => v.id === vehicleId && !v.deletedAt);
+            if (!vehicle) return;
+            let moved = 0;
+            for (const d of family.documents) {
+              if (!docIds.includes(d.id) || d.vehicleId === vehicleId) continue;
+              d.vehicleId = vehicleId;
+              d.updatedAt = Date.now();
+              moved++;
+            }
+            if (moved) log(family, viewer, 'changed', `filed ${moved === 1 ? 'a paper' : `${moved} papers`} under ${vehicle.name}`);
+          });
+        },
+
+        addDocVersion(docId, label, files) {
+          let versionId: ID | undefined;
+          onFamily((family, viewer) => {
+            const doc = family.documents.find((d) => d.id === docId);
+            if (!doc || doc.deletedAt || !files.length) return;
+            const name = freshLabel(doc, label);
+            versionId = newId();
+            const now = Date.now();
+            doc.versions = [...docVersions(doc), { id: versionId, label: name, addedAt: now, addedBy: viewer }];
+            doc.files = [...doc.files, ...files.map((f) => ({ ...f, versionId }))];
+            doc.updatedAt = now;
+            log(family, viewer, 'changed', `added a ${name.toLowerCase()} version of ${doc.title}`);
+          });
+          return versionId;
+        },
+
+        addVersionPages(docId, versionId, files) {
+          onFamily((family, viewer) => {
+            const doc = family.documents.find((d) => d.id === docId);
+            const version = doc ? docVersions(doc).find((v) => v.id === versionId) : undefined;
+            if (!doc || !version || !files.length) return;
+            doc.files = [...doc.files, ...files.map((f) => ({ ...f, versionId: versionId === MAIN_VERSION ? undefined : versionId }))];
+            doc.updatedAt = Date.now();
+            log(family, viewer, 'changed', `added ${files.length === 1 ? 'a page' : `${files.length} pages`} to the ${version.label.toLowerCase()} version of ${doc.title}`);
+          });
+        },
+
+        renameDocVersion(docId, versionId, label) {
+          onFamily((family, viewer) => {
+            const doc = family.documents.find((d) => d.id === docId);
+            const clean = label.trim().slice(0, 40);
+            if (!doc || !clean) return;
+            const list = docVersions(doc);
+            const target = list.find((v) => v.id === versionId);
+            if (!target || target.label === clean) return;
+            const others = { ...doc, versions: list.filter((v) => v.id !== versionId) };
+            const name = freshLabel(others, clean);
+            doc.versions = list.map((v) => (v.id === versionId ? { ...v, label: name } : v));
+            doc.updatedAt = Date.now();
+            log(family, viewer, 'changed', `renamed a version of ${doc.title} to ${name}`);
+          });
+        },
+
+        removeDocVersion(docId, versionId) {
+          onFamily((family, viewer) => {
+            const doc = family.documents.find((d) => d.id === docId);
+            if (!doc) return;
+            const list = docVersions(doc);
+            const target = list.find((v) => v.id === versionId);
+            if (!target || list.length < 2) return; // the last version goes with the document itself
+            const gone = versionFiles(doc, versionId);
+            gone.forEach((f) => void removeFile(f).catch(() => undefined));
+            let files = doc.files.filter((f) => (f.versionId ?? MAIN_VERSION) !== versionId);
+            let versions = list.filter((v) => v.id !== versionId);
+            if (versionId === MAIN_VERSION) {
+              // The next version becomes the first: its pages lose their version id.
+              const next = versions[0];
+              files = files.map((f) => (f.versionId === next.id ? { ...f, versionId: undefined } : f));
+              versions = [{ ...next, id: MAIN_VERSION }, ...versions.slice(1)];
+            }
+            doc.files = files;
+            doc.versions = versions.length > 1 || versions[0].label !== 'Original' ? versions : undefined;
+            doc.updatedAt = Date.now();
+            log(family, viewer, 'changed', `removed the ${target.label.toLowerCase()} version of ${doc.title}`);
+          });
+        },
+
+        mergeDocuments(keepId, otherIds) {
+          onFamily((family, viewer) => {
+            const keep = family.documents.find((d) => d.id === keepId);
+            if (!keep || keep.deletedAt) return;
+            for (const otherId of otherIds) {
+              const other = family.documents.find((d) => d.id === otherId && d.id !== keepId);
+              if (!other || other.templateId !== keep.templateId) continue;
+              // Each of the other's versions comes across under its own label (or "Another copy").
+              let versions = docVersions(keep);
+              let files = [...keep.files];
+              for (const v of docVersions(other)) {
+                const pages = versionFiles(other, v.id);
+                if (!pages.length) continue;
+                const id = newId();
+                const label = freshLabel({ ...keep, versions }, v.id === MAIN_VERSION && v.label === 'Original' ? 'Another copy' : v.label);
+                versions = [...versions, { id, label, addedAt: other.createdAt, addedBy: other.createdBy }];
+                files = [...files, ...pages.map((f) => ({ ...f, versionId: id }))];
+              }
+              keep.versions = versions;
+              keep.files = files;
+              keep.number ??= other.number;
+              keep.issueDate ??= other.issueDate;
+              keep.expiryDate ??= other.expiryDate;
+              keep.original ??= other.original;
+              keep.nominee ??= other.nominee;
+              keep.description ??= other.description;
+              keep.updatedAt = Date.now();
+              // The other one is gone, not in Recently deleted: its pages now live here.
+              family.documents = family.documents.filter((d) => d.id !== other.id);
+              for (const t of family.tasks) if (t.linkedDocId === other.id) t.linkedDocId = keep.id;
+              log(family, viewer, 'changed', `merged ${other.title} into ${keep.title}`);
+            }
+          });
+        },
+
         deleteItem(collection, id) {
           onFamily((family, viewer) => {
-            const item = (family[collection] as { id: ID; deletedAt?: number; deletedBy?: ID }[]).find((i) => i.id === id);
+            const item = ((family[collection] ?? []) as { id: ID; deletedAt?: number; deletedBy?: ID }[]).find((i) => i.id === id);
             if (!item || item.deletedAt) return;
             item.deletedAt = Date.now();
             item.deletedBy = viewer;
@@ -550,7 +706,7 @@ export const useApp = create<AppState>()(
 
         restoreItem(collection, id) {
           onFamily((family, viewer) => {
-            const item = (family[collection] as { id: ID; deletedAt?: number; deletedBy?: ID }[]).find((i) => i.id === id);
+            const item = ((family[collection] ?? []) as { id: ID; deletedAt?: number; deletedBy?: ID }[]).find((i) => i.id === id);
             if (!item || !item.deletedAt) return;
             item.deletedAt = undefined;
             item.deletedBy = undefined;
@@ -573,6 +729,7 @@ export const useApp = create<AppState>()(
               family.bankAccounts = alive(family.bankAccounts);
               family.cards = alive(family.cards);
               family.notes = alive(family.notes);
+              if (family.vehicles?.some((v) => v.deletedAt && v.deletedAt < cutoff)) family.vehicles = alive(family.vehicles);
               family.tasks = alive(family.tasks);
             }
           });
@@ -766,7 +923,7 @@ export const useApp = create<AppState>()(
         const sync = { ...(s.cloud?.sync ?? {}) };
         for (const id of cloudOnly) {
           const f = s.families[id];
-          families[id] = { ...f, members: [], documents: [], logins: [], bankAccounts: [], cards: [], notes: [], tasks: [], contacts: [], activity: [], reminderPrefs: {}, removalRequests: [] };
+          families[id] = { ...f, members: [], documents: [], logins: [], bankAccounts: [], cards: [], notes: [], vehicles: [], tasks: [], contacts: [], activity: [], reminderPrefs: {}, removalRequests: [] };
           if (sync[id]) sync[id] = { ...sync[id], cursor: 0, base: {}, locked: {} };
         }
         return { version: s.version, families, session: s.session, device: s.device, cloud: s.cloud ? { ...s.cloud, sync } : undefined };

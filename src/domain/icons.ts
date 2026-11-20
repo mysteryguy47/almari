@@ -20,6 +20,7 @@ export const ICON_NAMES = [
   'Syringe', 'TestTube', 'Ticket', 'Tractor', 'Trash', 'TrendingUp', 'TriangleExclamationPoint', 'Truck', 'Tv',
   'Umbrella', 'Undo2', 'User', 'UserCheck', 'UserPlus', 'Users', 'Vault', 'Wallet', 'Wheat', 'Wifi', 'Wrench',
   'X', 'Zap',
+  'CarFront', 'Crop', 'Files', 'Layers', 'Merge', 'Motorbike', 'Ratio', 'RectangleHorizontal', 'RectangleVertical', 'RotateCw', 'Scan', 'Square',
 ] as const;
 
 export type IconName = (typeof ICON_NAMES)[number];

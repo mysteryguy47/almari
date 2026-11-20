@@ -6,6 +6,7 @@ import { Avatar, Stamp } from '@/components/Bits';
 import { Button } from '@/components/Button';
 import { Segmented } from '@/components/Fields';
 import { Card, EmptyState, Row, Screen, Section } from '@/components/Layout';
+import { BankMark } from '@/components/Marks';
 import { T } from '@/components/Text';
 import { displayName, findMember, visibleTo } from '@/domain/access';
 import { daysUntil, relativeDays } from '@/domain/dates';
@@ -90,8 +91,7 @@ export default function Locker() {
                         testID={`account-${a.id}`}
                         title={a.bank}
                         subtitle={`${ACCOUNT_TYPE_LABELS[a.type]} account · ${maskTail(a.accountNumber)}`}
-                        icon="Landmark"
-                        tint="haldi"
+                        left={<BankMark bank={a.bank} />}
                         divider={i > 0}
                         right={a.onlyMe ? <Stamp text="Only me" /> : undefined}
                         onPress={() => router.push(`/bank/${a.id}`)}
@@ -105,8 +105,7 @@ export default function Locker() {
                           testID={`card-${c.id}`}
                           title={`${c.bank}${c.nickname ? ` ${c.nickname}` : ''}`}
                           subtitle={[CARD_TYPE_LABELS[c.type], maskTail(c.number), due !== null ? `bill due ${relativeDays(due)}` : null].filter(Boolean).join(' · ')}
-                          icon="CreditCard"
-                          tint="inland"
+                          left={<BankMark bank={c.bank} />}
                           divider={accounts.length + i > 0}
                           right={due !== null && due <= 7 ? <Stamp text={due <= 1 ? 'Pay now' : `${due} days`} tone="haldi" /> : undefined}
                           onPress={() => router.push(`/card/${c.id}`)}

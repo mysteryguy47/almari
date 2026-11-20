@@ -1,5 +1,6 @@
 import type { PdfSource } from '@/domain/pdf';
-import type { DocItem, FileRef } from '@/domain/types';
+import type { DocItem, FileRef, ID } from '@/domain/types';
+import { mainFiles, versionFiles } from '@/domain/versions';
 import { fileBytes } from '@/store/files';
 
 /** One stored file as a PDF ingredient: a photo, a PDF to copy in, or a note saying why it is not included. */
@@ -12,9 +13,11 @@ export async function fileToPdfSource(file: FileRef | undefined): Promise<PdfSou
   return file.kind === 'pdf' ? { kind: 'pdf', bytes } : { kind: 'image', bytes, mime: file.mime };
 }
 
-export async function docToPdfSources(doc: DocItem): Promise<PdfSource[]> {
-  if (doc.files.length === 0) return [{ kind: 'missing', reason: 'No file saved.' }];
-  return Promise.all(doc.files.map((f) => fileToPdfSource(f)));
+/** A document's pages as PDF ingredients: one version's, or the first version's. */
+export async function docToPdfSources(doc: DocItem, versionId?: ID): Promise<PdfSource[]> {
+  const files = versionId ? versionFiles(doc, versionId) : mainFiles(doc);
+  if (files.length === 0) return [{ kind: 'missing', reason: 'No file saved.' }];
+  return Promise.all(files.map((f) => fileToPdfSource(f)));
 }
 
 export function todayLabel(now: Date = new Date()): string {
