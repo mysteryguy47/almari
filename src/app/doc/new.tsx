@@ -271,7 +271,8 @@ export default function AddDocument() {
       }
       if (problem) setFileError(result.files.length > 1 ? `${problem}. The others were added.` : problem.replace(/^[^:]+: /, ''));
     } catch {
-      setFileError('Could not open that file. Try another, or a photo of it.');
+      // A tablet or Chromebook may have no camera at all: the camera is optional for installing Almari.
+      setFileError(fromCamera ? 'The camera could not open. Pick a photo or a file instead.' : 'Could not open that file. Try another, or a photo of it.');
     }
   };
 

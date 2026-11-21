@@ -101,7 +101,8 @@
           "recordAudioAndroid": false,
           "barcodeScannerEnabled": true
         }
-      ]
+      ],
+      "./plugins/with-optional-features"
     ],
     "experiments": {
       "typedRoutes": false,
