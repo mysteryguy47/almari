@@ -16,9 +16,8 @@ import { radius, space, tintColors } from '@/theme/tokens';
 
 import { Button } from './Button';
 import { TextField } from './Fields';
-import { Icon } from './Icon';
 import { Card, Row, Section } from './Layout';
-import { DocMark } from './Marks';
+import { CategoryMark, DocMark } from './Marks';
 import { Pressy } from './Pressy';
 import { T } from './Text';
 
@@ -120,7 +119,7 @@ export function TemplatePicker({ onPick, initialCategory, ownerId }: { onPick: (
             >
               {CATEGORIES.map((c) => {
                 const on = c.id === category;
-                const { fg, bg } = tintColors(palette, c.tint);
+                const { fg } = tintColors(palette, c.tint);
                 return (
                   <View
                     key={c.id}
@@ -145,8 +144,8 @@ export function TemplatePicker({ onPick, initialCategory, ownerId }: { onPick: (
                     scaleTo={0.95}
                     style={styles.cat}
                   >
-                    <View style={[styles.catIcon, { backgroundColor: on ? fg : bg }]}>
-                      <Icon name={c.icon} size={22} rawColor={on ? palette.surface : fg} />
+                    <View style={[styles.catRing, { borderColor: on ? fg : 'transparent' }]}>
+                      <CategoryMark categoryId={c.id} size={46} />
                     </View>
                     <T variant="small" color={on ? 'ink' : 'ink2'} align="center" numberOfLines={2} style={on ? styles.catOn : null}>
                       {SHORT[c.id] ?? c.name}
@@ -187,7 +186,7 @@ const styles = StyleSheet.create({
   stripOuter: { marginHorizontal: -space.xl },
   strip: { paddingHorizontal: space.xl - 4, gap: 2, paddingBottom: space.xs },
   cat: { width: 78, alignItems: 'center', gap: 6, paddingVertical: space.xs, borderRadius: radius.md },
-  catIcon: { width: 52, height: 52, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  catRing: { padding: 2, borderRadius: 18, borderWidth: 2 },
   catOn: { fontWeight: '600' },
   dot: { width: 5, height: 5, borderRadius: 3 },
 });

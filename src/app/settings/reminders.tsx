@@ -1,11 +1,11 @@
 import { Redirect } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
-import { IconTile } from '@/components/Bits';
 import { ToggleRow } from '@/components/Fields';
 import { Card, Screen, Section } from '@/components/Layout';
 import { NotifyCard } from '@/components/NotifyCard';
 import { T } from '@/components/Text';
+import { CategoryMark } from '@/components/Marks';
 import { prefsFor } from '@/domain/reminders';
 import { CATEGORIES } from '@/domain/templates';
 import { useApp } from '@/store/app-store';
@@ -42,7 +42,7 @@ export default function ReminderSettings() {
           <Card padded={false}>
             {CATEGORIES.map((c, i) => (
               <View key={c.id} style={[styles.row, i > 0 ? { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: palette.line } : null]}>
-                <IconTile icon={c.icon} tint={c.tint} size={36} />
+                <CategoryMark categoryId={c.id} size={36} />
                 <View style={styles.flex}>
                   <ToggleRow
                     title={c.name}

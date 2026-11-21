@@ -11,15 +11,15 @@ import { useTheme } from '@/theme/ThemeProvider';
 import { radius, space } from '@/theme/tokens';
 
 import { Button } from './Button';
-import { TextField } from './Fields';
-import { Icon } from './Icon';
+import { TextField, ToggleRow } from './Fields';
 import { Section } from './Layout';
 import { FAMILY, MemberPicker } from './MemberPicker';
 import { NumberPlate } from './Marks';
 import { Sheet } from './Sheet';
 import { T } from './Text';
+import { VehicleGlyph } from './VehicleGlyph';
 
-/** Add a vehicle, or change one: what it is, what it is called, its number plate, and whose name the RC is in. */
+/** Add a vehicle, or change one: what it is, what it is called, its number plate, whether it is electric, and whose name the RC is in. */
 export function VehicleSheet({ visible, onClose, family, vehicle, onSaved }: {
   visible: boolean;
   onClose: () => void;
@@ -42,6 +42,7 @@ function VehicleForm({ family, vehicle, onSaved, onClose }: { family: Family; ve
   const [name, setName] = useState(vehicle?.name ?? '');
   const [number, setNumber] = useState(vehicle?.number ?? '');
   const [registeredTo, setRegisteredTo] = useState<ID | undefined>(vehicle?.registeredTo);
+  const [electric, setElectric] = useState(vehicle?.electric ?? false);
   const [tried, setTried] = useState(false);
   const members = family.members.filter((m) => m.status !== 'memorial' && !m.isPet);
   const nameCheck = checkRequiredText(name, 'Name', 40);
@@ -49,7 +50,7 @@ function VehicleForm({ family, vehicle, onSaved, onClose }: { family: Family; ve
   const save = () => {
     setTried(true);
     if (nameCheck.level === 'error') return;
-    const id = saveVehicle({ id: vehicle?.id, kind, name: name.trim(), number: number.trim() ? normalisePlate(number) : undefined, registeredTo, notes: vehicle?.notes });
+    const id = saveVehicle({ id: vehicle?.id, kind, name: name.trim(), number: number.trim() ? normalisePlate(number) : undefined, registeredTo, electric, notes: vehicle?.notes });
     haptic.success();
     toast(vehicle ? 'Vehicle saved' : `${name.trim()} added. Its papers go here.`, { tone: 'success' });
     onSaved?.(id);
@@ -71,16 +72,20 @@ function VehicleForm({ family, vehicle, onSaved, onClose }: { family: Family; ve
               accessibilityRole="radio"
               accessibilityState={{ selected: on }}
               accessibilityLabel={k.label}
-              style={[styles.kind, { borderColor: on ? palette.accent : palette.line, backgroundColor: on ? palette.accentSoft : palette.surface }]}
+              style={({ pressed }) => [
+                styles.kind,
+                { borderColor: on ? palette.accent : palette.line, backgroundColor: on ? palette.accentSoft : palette.surface },
+                pressed && !on ? styles.pressed : null,
+              ]}
               testID={`vehicle-kind-${k.value}`}
             >
-              <Icon name={k.icon} size={22} color={on ? 'accent' : 'ink2'} />
-              <T variant="small" color={on ? 'accent' : 'ink2'} numberOfLines={1}>{k.label}</T>
+              <VehicleGlyph kind={k.value} size={44} color={on ? palette.accent : palette.ink3} />
+              <T variant={on ? 'smallStrong' : 'small'} color={on ? 'accent' : 'ink2'} numberOfLines={1}>{k.label}</T>
             </Pressable>
           );
         })}
       </View>
-      <TextField label="What do you call it?" value={name} onChangeText={setName} placeholder={kind === 'car' ? 'Swift, Papa’s car' : kind === 'tractor' ? 'Mahindra tractor' : 'Activa, Splendor'} max={40} required check={nameCheck} showCheck={tried} testID="vehicle-name" />
+      <TextField label="What do you call it?" value={name} onChangeText={setName} placeholder={VEHICLE_KINDS.find((k) => k.value === kind)?.example} max={40} required check={nameCheck} showCheck={tried} testID="vehicle-name" />
       <TextField
         label="Number plate"
         value={number}
@@ -91,6 +96,9 @@ function VehicleForm({ family, vehicle, onSaved, onClose }: { family: Family; ve
         testID="vehicle-number"
         right={normalisePlate(number).length >= 6 ? <View style={styles.plate}><NumberPlate number={number} size="sm" /></View> : undefined}
       />
+      <View style={styles.electric}>
+        <ToggleRow title="Electric" subtitle="Electric vehicles need no PUC, so Almari won’t ask for one." value={electric} onValueChange={setElectric} testID="vehicle-electric" />
+      </View>
       <Section title="RC in whose name?">
         <MemberPicker members={members} value={[registeredTo ?? FAMILY]} onChange={(v) => setRegisteredTo(v[0] === FAMILY ? undefined : v[0])} allowFamily familyLabel="Not sure" testID="vehicle-owner" />
       </Section>
@@ -101,6 +109,8 @@ function VehicleForm({ family, vehicle, onSaved, onClose }: { family: Family; ve
 
 const styles = StyleSheet.create({
   kinds: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm, marginBottom: space.lg },
-  kind: { width: '31.5%', flexGrow: 1, alignItems: 'center', gap: 4, paddingVertical: space.sm, borderRadius: radius.md, borderWidth: 1.2 },
+  kind: { width: '31.5%', flexGrow: 1, alignItems: 'center', paddingBottom: space.sm, borderRadius: radius.md, borderWidth: 1.2 },
+  pressed: { opacity: 0.7 },
   plate: { marginLeft: space.sm },
+  electric: { marginBottom: space.lg },
 });

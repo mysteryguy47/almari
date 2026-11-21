@@ -226,12 +226,12 @@ export function Divider() {
   return <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: palette.line, marginVertical: space.sm }} />;
 }
 
-export function Tile({ icon, label, tint, onPress, testID, badge }: { icon: IconName; label: string; tint: Tint; onPress: () => void; testID?: string; badge?: string }) {
+export function Tile({ icon, mark, label, tint, onPress, testID, badge }: { icon: IconName; mark?: ReactNode; label: string; tint: Tint; onPress: () => void; testID?: string; badge?: string }) {
   const { palette } = useTheme();
   const lift = useLift();
   return (
     <Pressy testID={testID} onPress={onPress} outerStyle={styles.tileOuter} style={[styles.tile, { backgroundColor: palette.surface, borderColor: palette.line }, lift]} accessibilityLabel={label}>
-      <IconTile icon={icon} tint={tint} size={44} />
+      {mark ?? <IconTile icon={icon} tint={tint} size={44} />}
       <T variant="smallStrong" numberOfLines={2}>{label}</T>
       {badge ? <T variant="small" color="ink2">{badge}</T> : null}
     </Pressy>

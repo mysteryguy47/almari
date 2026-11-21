@@ -5,6 +5,9 @@
 // lower case (sbin.webp, hdfc.webp). Source: github.com/praveenpuglia/indian-banks.
 // Document logos are named for the office that issues the paper (aadhaar,
 // income-tax, eci), from Wikimedia Commons and Wikipedia.
+// Paper and category pictures (papers/driving-licence.webp, categories/home.webp)
+// are drawn from Microsoft's Fluent Emoji (MIT licence), a picture and, where
+// papers are alike, a smaller one in the corner (an ID card with a car on it).
 // Each is trimmed to its edges, at most 160 px on the long side, WebP.
 import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -58,6 +61,18 @@ ${entries('banks')}
 export const DOC_LOGOS: Record<string, LogoAsset> = {
 ${entries('docs')}
 };
+
+/** A picture for each paper without an issuer's logo, by template id. */
+export const PAPER_ART: Record<string, LogoAsset> = {
+${entries('papers')}
+};
+
+/** A picture for each category, by category id. */
+export const CATEGORY_ART: Record<string, LogoAsset> = {
+${entries('categories')}
+};
 `,
 );
-console.log(`${list('banks').length} bank logos, ${list('docs').length} document logos`);
+console.log(
+  `${list('banks').length} bank logos, ${list('docs').length} document logos, ${list('papers').length} paper pictures, ${list('categories').length} category pictures`,
+);

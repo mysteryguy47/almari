@@ -173,6 +173,10 @@ describe('vehicles', () => {
     // A deleted vehicle's papers count as under no vehicle.
     expect(looseVehicleDocs(f, 'ananya').map((d) => d.id).sort()).toEqual(['loose', 'puc-old']);
     expect(missingEssentials(vehicleDocs(f, 'ananya', 'car'))).toEqual(['puc']);
+    // An electric car has no exhaust to test, so it is never asked for a PUC.
+    expect(missingEssentials(vehicleDocs(f, 'ananya', 'car'), { electric: true })).toEqual([]);
+    expect(missingEssentials([], { electric: true })).toEqual(['rc', 'vehicle-insurance']);
+    expect(missingEssentials([], { electric: false })).toEqual(['rc', 'vehicle-insurance', 'puc']);
     expect(vehicleByPlate(f, 'dl 3c ab 1234')?.id).toBe('car');
     expect(vehicleByPlate(f, 'DL3C')).toBeUndefined();
   });

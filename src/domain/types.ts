@@ -237,6 +237,8 @@ export interface Vehicle extends Ownable {
   number?: string;
   /** The member the RC is in the name of (shown only; it does not limit who sees it). */
   registeredTo?: ID;
+  /** Runs on a battery: no PUC to keep. */
+  electric?: boolean;
   notes?: string;
 }
 

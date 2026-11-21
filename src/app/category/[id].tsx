@@ -2,12 +2,12 @@ import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
-import { IconTile, Stamp } from '@/components/Bits';
+import { Stamp } from '@/components/Bits';
 import { Button } from '@/components/Button';
 import { DocThumb } from '@/components/DocThumb';
 import { Icon } from '@/components/Icon';
 import { Card, Row, Screen, Section, useLift } from '@/components/Layout';
-import { DocMark, NumberPlate } from '@/components/Marks';
+import { CategoryMark, DocMark, NumberPlate, VehicleMark } from '@/components/Marks';
 import { Pressy } from '@/components/Pressy';
 import { T } from '@/components/Text';
 import { VehicleSheet } from '@/components/VehicleSheet';
@@ -17,7 +17,7 @@ import { listNumber } from '@/domain/money';
 import { getCategory, getTemplate, templatesIn, type CategoryId } from '@/domain/templates';
 import type { DocItem, Family, ID } from '@/domain/types';
 import { mainFiles } from '@/domain/versions';
-import { looseVehicleDocs, missingEssentials, vehicleAttention, vehicleDocs, vehicleIcon, vehiclesOf } from '@/domain/vehicles';
+import { looseVehicleDocs, missingEssentials, vehicleAttention, vehicleDocs, vehiclesOf } from '@/domain/vehicles';
 import { stampFor } from '@/lib/attention';
 import { useApp } from '@/store/app-store';
 import { useCtx } from '@/store/hooks';
@@ -76,14 +76,14 @@ function VehicleCard({ family, viewerId, id }: { family: Family; viewerId: ID; i
   if (!vehicle) return null;
   const docs = vehicleDocs(family, viewerId, vehicle.id);
   const attention = vehicleAttention(docs);
-  const missing = missingEssentials(docs);
+  const missing = missingEssentials(docs, vehicle);
   const line = attention
     ? `${getTemplate(attention.doc.templateId).short ?? attention.doc.title} ${attention.days < 0 ? 'expired' : `due ${relativeDays(attention.days)}`}`
-    : missing.length ? `${missing.length === 3 ? 'No papers yet' : `${docs.length} ${docs.length === 1 ? 'paper' : 'papers'}, ${missing.map((m) => getTemplate(m).short).join(' and ')} not added`}`
+    : missing.length ? `${!docs.length ? 'No papers yet' : `${docs.length} ${docs.length === 1 ? 'paper' : 'papers'}, ${missing.map((m) => getTemplate(m).short).join(' and ')} not added`}`
       : `${docs.length} papers, all in order`;
   return (
     <Pressy onPress={() => router.push(`/vehicle/${vehicle.id}`)} accessibilityLabel={`${vehicle.name}. ${line}`} testID={`vehicle-${vehicle.id}`} style={[styles.vehicle, { backgroundColor: palette.surface, borderColor: palette.line }, lift]}>
-      <IconTile icon={vehicleIcon(vehicle.kind)} tint="inland" size={48} />
+      <VehicleMark kind={vehicle.kind} size={48} />
       <View style={styles.vehicleText}>
         <T variant="bodyStrong" numberOfLines={1}>{vehicle.name}</T>
         {vehicle.number ? <NumberPlate number={vehicle.number} size="sm" /> : null}
@@ -165,7 +165,7 @@ export default function Category() {
   return (
     <Screen title={category.name} subtitle={category.scope === 'common' ? 'Shared with the whole family' : 'Personal papers'} testID="category">
       <View style={styles.head}>
-        <IconTile icon={category.icon} tint={category.tint} size={56} />
+        <CategoryMark categoryId={category.id} size={56} />
         <T variant="body" color="ink2" style={styles.flex}>
           {vehicles
             ? count ? `${count} ${count === 1 ? 'vehicle' : 'vehicles'}, ${docs.length} ${docs.length === 1 ? 'paper' : 'papers'}` : 'No vehicles yet.'

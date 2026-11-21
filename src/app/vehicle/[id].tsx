@@ -2,21 +2,21 @@ import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
-import { IconTile, Stamp } from '@/components/Bits';
+import { Stamp } from '@/components/Bits';
 import { Button } from '@/components/Button';
 import { DocThumb } from '@/components/DocThumb';
 import { DeleteItem, NotFound } from '@/components/ItemBits';
 import { Card, Row, Screen, Section, useLift } from '@/components/Layout';
-import { DocMark, NumberPlate } from '@/components/Marks';
+import { DocMark, NumberPlate, VehicleMark } from '@/components/Marks';
 import { T } from '@/components/Text';
 import { VehicleSheet } from '@/components/VehicleSheet';
 import { displayName, findMember } from '@/domain/access';
 import { daysUntil, formatDate, relativeDays } from '@/domain/dates';
 import { listNumber } from '@/domain/money';
-import { getTemplate, VEHICLE_ESSENTIALS } from '@/domain/templates';
+import { getTemplate } from '@/domain/templates';
 import type { DocItem } from '@/domain/types';
 import { mainFiles } from '@/domain/versions';
-import { findVehicle, missingEssentials, vehicleAttention, vehicleDocs, vehicleIcon, vehicleKindLabel } from '@/domain/vehicles';
+import { findVehicle, missingEssentials, vehicleAttention, vehicleDocs, vehicleKindLabel } from '@/domain/vehicles';
 import { stampFor } from '@/lib/attention';
 import { useCtx } from '@/store/hooks';
 import { useTheme } from '@/theme/ThemeProvider';
@@ -61,7 +61,7 @@ export default function VehicleScreen() {
   const docs = vehicleDocs(family, viewerId, vehicle.id);
   const papers = docs.filter((d) => !UPKEEP.has(d.templateId));
   const upkeep = docs.filter((d) => UPKEEP.has(d.templateId)).sort((a, b) => (b.issueDate ?? '').localeCompare(a.issueDate ?? '') || b.createdAt - a.createdAt);
-  const missing = missingEssentials(docs);
+  const missing = missingEssentials(docs, vehicle);
   const attention = vehicleAttention(docs);
   const owner = findMember(family, vehicle.registeredTo);
   const add = (template?: string) => router.push({ pathname: '/doc/new', params: template ? { template, vehicle: vehicle.id } : { category: 'vehicles', vehicle: vehicle.id } });
@@ -69,12 +69,12 @@ export default function VehicleScreen() {
   return (
     <Screen
       title={vehicle.name}
-      subtitle={vehicleKindLabel(vehicle.kind)}
+      subtitle={vehicle.electric ? `${vehicleKindLabel(vehicle.kind)} · Electric` : vehicleKindLabel(vehicle.kind)}
       right={<Pressable onPress={() => setEditing(true)} accessibilityRole="button" hitSlop={8} testID="vehicle-edit"><T variant="smallStrong" color="accent">Edit</T></Pressable>}
       testID="vehicle-view"
     >
       <View style={[styles.hero, { backgroundColor: palette.surface, borderColor: palette.line }, lift]}>
-        <IconTile icon={vehicleIcon(vehicle.kind)} tint="inland" size={56} />
+        <VehicleMark kind={vehicle.kind} size={56} />
         <View style={styles.heroText}>
           {vehicle.number ? <NumberPlate number={vehicle.number} size="lg" /> : <T variant="body" color="ink3">No number plate yet</T>}
           <T variant="small" color="ink2">{owner ? `RC in ${owner.id === viewerId ? 'your' : `${displayName(owner)}’s`} name` : 'For the whole family'} · {docs.length} {docs.length === 1 ? 'paper' : 'papers'}</T>
@@ -93,7 +93,7 @@ export default function VehicleScreen() {
       <Section title="Papers">
         <Card padded={false}>
           {papers.map((d, i) => <DocRow key={d.id} d={d} divider={i > 0} />)}
-          {VEHICLE_ESSENTIALS.filter((t) => missing.includes(t)).map((t, i) => (
+          {missing.map((t, i) => (
             <Row
               key={t}
               testID={`vadd-${t}`}

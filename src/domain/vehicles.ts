@@ -4,23 +4,18 @@
  */
 import { visibleTo } from './access';
 import { daysUntil } from './dates';
-import type { IconName } from './icons';
 import { getTemplate, nameInSentence, VEHICLE_ESSENTIALS } from './templates';
 import type { DocItem, Family, ID, Vehicle, VehicleKind } from './types';
 import { OK, type Check } from './validation';
 
-export const VEHICLE_KINDS: { value: VehicleKind; label: string; icon: IconName }[] = [
-  { value: 'car', label: 'Car', icon: 'Car' },
-  { value: 'bike', label: 'Motorcycle', icon: 'Motorbike' },
-  { value: 'scooter', label: 'Scooter', icon: 'Motorbike' },
-  { value: 'tractor', label: 'Tractor', icon: 'Tractor' },
-  { value: 'commercial', label: 'Truck or taxi', icon: 'Truck' },
-  { value: 'other', label: 'Other', icon: 'CarFront' },
+export const VEHICLE_KINDS: { value: VehicleKind; label: string; example: string }[] = [
+  { value: 'car', label: 'Car', example: 'Swift, Papa’s car' },
+  { value: 'bike', label: 'Motorcycle', example: 'Splendor, Bullet' },
+  { value: 'scooter', label: 'Scooter', example: 'Activa, Jupiter' },
+  { value: 'tractor', label: 'Tractor', example: 'Mahindra 575' },
+  { value: 'commercial', label: 'Truck or taxi', example: 'Tata Ace, Ertiga taxi' },
+  { value: 'other', label: 'Other', example: 'E-rickshaw, van' },
 ];
-
-export function vehicleIcon(kind: VehicleKind): IconName {
-  return VEHICLE_KINDS.find((k) => k.value === kind)?.icon ?? 'Car';
-}
 
 export function vehicleKindLabel(kind: VehicleKind): string {
   return VEHICLE_KINDS.find((k) => k.value === kind)?.label ?? 'Vehicle';
@@ -93,10 +88,15 @@ export function vehicleAttention(docs: DocItem[]): { doc: DocItem; days: number 
   return best;
 }
 
-/** Which of RC, insurance and PUC the vehicle has no paper for yet. */
-export function missingEssentials(docs: DocItem[]): string[] {
+/** The papers every vehicle needs: RC, insurance and PUC. Electric vehicles need no PUC (no exhaust to test). */
+export function essentialsFor(vehicle: Pick<Vehicle, 'electric'> | undefined): string[] {
+  return VEHICLE_ESSENTIALS.filter((id) => !(id === 'puc' && vehicle?.electric));
+}
+
+/** Which of the vehicle's essential papers it has no paper for yet. */
+export function missingEssentials(docs: DocItem[], vehicle?: Pick<Vehicle, 'electric'>): string[] {
   const have = new Set(docs.map((d) => d.templateId));
-  return VEHICLE_ESSENTIALS.filter((id) => !have.has(id));
+  return essentialsFor(vehicle).filter((id) => !have.has(id));
 }
 
 /** "Swift insurance", "Activa PUC": the title a vehicle paper gets unless the person types one. */

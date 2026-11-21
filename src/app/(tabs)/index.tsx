@@ -8,6 +8,7 @@ import { NudgeCards } from '@/components/Nudges';
 import { Icon } from '@/components/Icon';
 import { itemMark } from '@/components/ItemMark';
 import { Card, Row, Screen, Section, Tile } from '@/components/Layout';
+import { CategoryMark } from '@/components/Marks';
 import { Pressy } from '@/components/Pressy';
 import { T } from '@/components/Text';
 import { displayName, familyRow, findMember, firstName, visibleTo } from '@/domain/access';
@@ -193,6 +194,7 @@ export default function Home() {
               key={c.id}
               testID={`category-${c.id}`}
               icon={c.icon}
+              mark={<CategoryMark categoryId={c.id} size={44} />}
               tint={c.tint}
               label={c.name}
               badge={c.id === 'vehicles' && vehiclesOf(family).length
