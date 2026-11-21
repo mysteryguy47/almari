@@ -109,6 +109,54 @@
           });
         });
       }
+
+      // Updates for the installed app. A phone keeps it open in the background
+      // for days, so reopening it only resumes the old release. When it comes
+      // back after a minute or more (the vault locks then anyway), it looks for
+      // a newer release and reloads into it, unless a box on screen has text in
+      // it that could be lost; then it tries again the next time.
+      (function () {
+        if (location.port === '8081') return;
+        var ENTRY = /\/_expo\/static\/js\/web\/entry-[^"']+\.js/;
+        var AWAY_MS = 60 * 1000;
+        var hiddenAt = 0;
+
+        function current() {
+          var script = document.querySelector('script[src*="/_expo/static/js/web/entry-"]');
+          var match = script && script.getAttribute('src').match(ENTRY);
+          return match && match[0];
+        }
+
+        function typing() {
+          var boxes = document.querySelectorAll('input, textarea');
+          for (var i = 0; i < boxes.length; i++) if (boxes[i].value) return true;
+          return false;
+        }
+
+        function check() {
+          var now = current();
+          if (!now) return;
+          fetch('/', { cache: 'no-store' })
+            .then(function (response) { return response.ok ? response.text() : ''; })
+            .then(function (html) {
+              var match = html.match(ENTRY);
+              var latest = match && match[0];
+              if (!latest || latest === now || typing()) return;
+              // Never loop on one release if the page somehow comes back old.
+              try {
+                if (sessionStorage.getItem('almari-reloaded-for') === latest) return;
+                sessionStorage.setItem('almari-reloaded-for', latest);
+              } catch (e) {}
+              location.reload();
+            })
+            .catch(function () {});
+        }
+
+        document.addEventListener('visibilitychange', function () {
+          if (document.visibilityState === 'hidden') hiddenAt = Date.now();
+          else if (hiddenAt && Date.now() - hiddenAt >= AWAY_MS) check();
+        });
+      })();
     </script>
   </head>
 
